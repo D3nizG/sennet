@@ -1,0 +1,252 @@
+import { Server } from 'socket.io';
+import type { AuthenticatedSocket } from '../index.js';
+import { GameManager } from '../../services/gameManager.js';
+import { GameMoveSchema, StartAIGameSchema } from '../events.js';
+import { runAITurn } from '../../services/aiPlayer.js';
+import { startInitialRolls } from './queue.js';
+import { getLegalMoves, PlayerId, type AIDifficulty, type Move } from '@sennet/game-engine';
+
+export function registerGameHandlers(
+  socket: AuthenticatedSocket,
+  io: Server,
+  gameManager: GameManager,
+  withRateLimit: (fn: (...args: any[]) => void) => (...args: any[]) => void,
+): void {
+  const userId = socket.data.user.userId;
+
+  // ── Start AI game ──────────────────────────────────────────────────────
+  socket.on('START_AI_GAME', withRateLimit(async (data: unknown) => {
+    const parsed = StartAIGameSchema.safeParse(data);
+    if (!parsed.success) {
+      socket.emit('GAME_ERROR', { code: 'INVALID_INPUT', message: 'Invalid AI game data' });
+      return;
+    }
+
+    if (gameManager.getByUser(userId)) {
+      socket.emit('GAME_ERROR', { code: 'ALREADY_IN_GAME', message: 'Already in a game' });
+      return;
+    }
+
+    const aiPlayer = {
+      userId: 'ai-player',
+      socketId: 'ai',
+      displayName: 'Pharaoh AI',
+      houseColor: '#8B4513',
+    };
+
+    try {
+      const game = await gameManager.createGame(
+        {
+          userId,
+          socketId: socket.id,
+          displayName: socket.data.displayName,
+          houseColor: socket.data.houseColor,
+        },
+        aiPlayer,
+        true,
+        parsed.data.difficulty,
+      );
+
+      socket.join(game.gameId);
+      socket.emit('QUEUE_MATCHED', {
+        gameId: game.gameId,
+        opponent: { id: 'ai-player', displayName: 'Pharaoh AI', houseColor: '#8B4513' },
+        yourPlayer: 'player1' as PlayerId,
+      });
+
+      startInitialRolls(io, gameManager, game.gameId);
+    } catch (err) {
+      console.error('AI game error:', err);
+      socket.emit('GAME_ERROR', { code: 'GAME_CREATE_ERROR', message: 'Failed to create AI game' });
+    }
+  }));
+
+  // ── Roll ────────────────────────────────────────────────────────────────
+  socket.on('GAME_ROLL', withRateLimit(async () => {
+    const game = gameManager.getByUser(userId);
+    if (!game) {
+      socket.emit('GAME_ERROR', { code: 'NO_GAME', message: 'Not in a game' });
+      return;
+    }
+
+    const playerId = gameManager.getPlayerIdForUser(game, userId);
+    if (!playerId || playerId !== game.state.currentPlayer) {
+      socket.emit('GAME_ERROR', { code: 'NOT_YOUR_TURN', message: 'Not your turn' });
+      return;
+    }
+    if (game.state.turnPhase !== 'roll') {
+      socket.emit('GAME_ERROR', { code: 'WRONG_PHASE', message: 'Must select a move first' });
+      return;
+    }
+
+    const { rollValue, legalMoves, event } = gameManager.doRoll(game);
+
+    io.to(game.gameId).emit('GAME_ROLL_RESULT', {
+      playerId,
+      value: rollValue,
+      legalMoves,
+      event,
+    });
+
+    // If blocked or rolled 6, send updated state
+    if (event === 'blocked' || event === 'rolled_6') {
+      emitStateToPlayers(io, game, gameManager);
+    }
+
+    // Check if it's now AI's turn
+    if (game.isAiGame && game.state.currentPlayer === game.aiPlayer && game.state.phase === 'playing') {
+      await handleAITurn(io, game, gameManager);
+    }
+  }));
+
+  // ── Move ────────────────────────────────────────────────────────────────
+  socket.on('GAME_MOVE', withRateLimit(async (data: unknown) => {
+    const parsed = GameMoveSchema.safeParse(data);
+    if (!parsed.success) {
+      socket.emit('GAME_ERROR', { code: 'INVALID_INPUT', message: 'Invalid move data' });
+      return;
+    }
+
+    const game = gameManager.getByUser(userId);
+    if (!game) {
+      socket.emit('GAME_ERROR', { code: 'NO_GAME', message: 'Not in a game' });
+      return;
+    }
+
+    const playerId = gameManager.getPlayerIdForUser(game, userId);
+    if (!playerId || playerId !== game.state.currentPlayer) {
+      socket.emit('GAME_ERROR', { code: 'NOT_YOUR_TURN', message: 'Not your turn' });
+      return;
+    }
+    if (game.state.turnPhase !== 'move' || game.state.currentRoll === null) {
+      socket.emit('GAME_ERROR', { code: 'WRONG_PHASE', message: 'Must roll first' });
+      return;
+    }
+
+    // Build the Move object from client data
+    const legalMoves = getLegalMoves(game.state, playerId, game.state.currentRoll);
+    const move = legalMoves.find(
+      m => m.pieceId === parsed.data.pieceId && m.to === parsed.data.toSquare,
+    );
+
+    if (!move) {
+      socket.emit('GAME_ERROR', { code: 'ILLEGAL_MOVE', message: 'That move is not legal' });
+      return;
+    }
+
+    try {
+      const { state, event } = gameManager.doMove(game, move);
+
+      io.to(game.gameId).emit('GAME_MOVE_APPLIED', {
+        move,
+        gameState: state,
+        event,
+      });
+
+      if (state.phase === 'finished' && state.winner) {
+        await gameManager.endGame(game, state.winner, 'all_pieces_off');
+        io.to(game.gameId).emit('GAME_OVER', {
+          winner: state.winner,
+          reason: 'all_pieces_off',
+          finalState: state,
+        });
+        return;
+      }
+
+      // AI turn
+      if (game.isAiGame && state.currentPlayer === game.aiPlayer && state.phase === 'playing') {
+        await handleAITurn(io, game, gameManager);
+      }
+    } catch (err: any) {
+      socket.emit('GAME_ERROR', { code: 'MOVE_ERROR', message: err.message });
+    }
+  }));
+
+  // ── Resign ──────────────────────────────────────────────────────────────
+  socket.on('GAME_RESIGN', withRateLimit(async () => {
+    const game = gameManager.getByUser(userId);
+    if (!game) {
+      socket.emit('GAME_ERROR', { code: 'NO_GAME', message: 'Not in a game' });
+      return;
+    }
+
+    const playerId = gameManager.getPlayerIdForUser(game, userId);
+    if (!playerId) return;
+
+    const state = await gameManager.resign(game, playerId);
+    io.to(game.gameId).emit('GAME_OVER', {
+      winner: state.winner!,
+      reason: 'resign',
+      finalState: state,
+    });
+  }));
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function emitStateToPlayers(io: Server, game: any, gameManager: GameManager): void {
+  for (const pid of ['player1', 'player2'] as PlayerId[]) {
+    const player = game.players[pid];
+    const opponent = pid === 'player1' ? game.players.player2 : game.players.player1;
+    const sock = io.sockets.sockets.get(player.socketId);
+    sock?.emit('GAME_STATE', {
+      gameState: game.state,
+      yourPlayer: pid,
+      opponentName: opponent.displayName,
+      opponentColor: opponent.houseColor,
+      isAiGame: game.isAiGame,
+    });
+  }
+}
+
+async function handleAITurn(
+  io: Server,
+  game: any,
+  gameManager: GameManager,
+): Promise<void> {
+  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+  await delay(1000); // Small delay so the human player sees what's happening
+
+  const difficulty = (game.aiDifficulty as AIDifficulty) || 'medium';
+  const result = runAITurn(game.state, game.aiPlayer!, difficulty);
+  game.state = result.finalState;
+
+  // Emit each action with delays for UX
+  for (const action of result.actions) {
+    await delay(600);
+    if (action.type === 'roll') {
+      io.to(game.gameId).emit('GAME_ROLL_RESULT', {
+        playerId: game.aiPlayer!,
+        value: action.value,
+        legalMoves: [],
+        event: action.event,
+      });
+    } else if (action.type === 'move') {
+      io.to(game.gameId).emit('GAME_MOVE_APPLIED', {
+        move: action.move,
+        gameState: game.state,
+        event: action.event,
+      });
+    } else if (action.type === 'blocked') {
+      io.to(game.gameId).emit('GAME_ROLL_RESULT', {
+        playerId: game.aiPlayer!,
+        value: action.rollValue,
+        legalMoves: [],
+        event: 'blocked',
+      });
+    }
+  }
+
+  // Send final state
+  emitStateToPlayers(io, game, gameManager);
+
+  // Check game over
+  if (game.state.phase === 'finished' && game.state.winner) {
+    await gameManager.endGame(game, game.state.winner, 'all_pieces_off');
+    io.to(game.gameId).emit('GAME_OVER', {
+      winner: game.state.winner,
+      reason: 'all_pieces_off',
+      finalState: game.state,
+    });
+  }
+}

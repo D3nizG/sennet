@@ -1,0 +1,123 @@
+:root {
+  /* Egyptian-inspired color palette */
+  --gold: #D4AF37;
+  --gold-light: #F0D060;
+  --gold-dark: #A88B2B;
+  --lapis: #26619C;
+  --lapis-light: #3B7FC4;
+  --papyrus: #F5E6C8;
+  --papyrus-dark: #E8D5A8;
+  --sand: #C2A35A;
+  --terra: #8B4513;
+  --nile: #1A5276;
+  --black: #1A1A2E;
+  --white: #FAF3E0;
+  --danger: #C0392B;
+  --success: #27AE60;
+  --bg: #16213E;
+  --bg-surface: #1A2744;
+  --bg-card: #0F3460;
+  --text: #FAF3E0;
+  --text-muted: #A8B2C1;
+  --border: rgba(212, 175, 55, 0.3);
+
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--bg) 0%, #0a1628 50%, #16213E 100%);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  border-color: var(--gold);
+}
+
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 1.2rem;
+  color: var(--gold);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: var(--black);
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--gold);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.1);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+  font-weight: 600;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #E74C3C;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}

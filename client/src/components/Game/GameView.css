@@ -1,0 +1,269 @@
+.game-view {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.player-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+.borne-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+}
+
+.turn-indicator {
+  text-align: center;
+}
+
+.phase-badge {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.phase-badge.your-turn {
+  background: rgba(212, 175, 55, 0.2);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+}
+
+.phase-badge.waiting {
+  background: rgba(168, 178, 193, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(168, 178, 193, 0.3);
+}
+
+.phase-badge.over {
+  background: rgba(192, 57, 43, 0.2);
+  color: var(--danger);
+}
+
+/* Controls */
+.game-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.roll-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.roll-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--gold);
+  color: var(--black);
+  font-size: 1.4rem;
+  font-weight: 700;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(212, 175, 55, 0.3);
+}
+
+.roll-label {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.roll-btn {
+  padding: 0.8rem 2.5rem;
+  font-size: 1.1rem;
+}
+
+.resign-btn {
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+}
+
+.move-hint {
+  color: var(--gold-light);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Event Notices */
+.event-notice {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.event-notice.blocked {
+  background: rgba(192, 57, 43, 0.2);
+  color: var(--danger);
+  border: 1px solid rgba(192, 57, 43, 0.4);
+}
+
+.event-notice.trap {
+  background: rgba(230, 126, 34, 0.2);
+  color: #E67E22;
+  border: 1px solid rgba(230, 126, 34, 0.4);
+}
+
+.event-notice.good {
+  background: rgba(39, 174, 96, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(39, 174, 96, 0.4);
+}
+
+/* Initial Rolls */
+.initial-rolls {
+  text-align: center;
+}
+
+.initial-rolls h3 {
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+
+.init-roll-row {
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+}
+
+.init-result {
+  margin-top: 0.5rem;
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 1.1rem;
+}
+
+/* Move Log */
+.move-log-container summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.move-log {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.log-entry {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.log-turn { color: var(--gold); min-width: 2rem; }
+.log-player { min-width: 2.5rem; }
+.log-player.player1 { color: #5DADE2; }
+.log-player.player2 { color: #F39C12; }
+.log-roll { min-width: 2rem; }
+.log-event { color: #E67E22; font-style: italic; }
+
+/* Game Over Overlay */
+.game-over-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.game-over-card {
+  text-align: center;
+  padding: 2rem 3rem;
+  animation: fadeInUp 0.3s ease;
+}
+
+.game-over-card h2 {
+  font-size: 2rem;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+
+.game-over-card p {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Legend */
+.legend h4 {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.legend-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.sq-sample {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+.sq-sample.danger { background: #FFCDD2; color: #B71C1C; }
+.sq-sample.bonus { background: #FFE082; color: #E65100; }
+.sq-sample.safe { background: #C8E6C9; color: #1B5E20; }

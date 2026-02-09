@@ -1,0 +1,73 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  displayName  String
+  houseColor   String   @default("#D4AF37")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stats                    UserStats?
+  gamesAsPlayer1           Game[]       @relation("GamePlayer1")
+  gamesAsPlayer2           Game[]       @relation("GamePlayer2")
+  gamesWon                 Game[]       @relation("GameWinner")
+  sentFriendRequests       Friendship[] @relation("FriendRequester")
+  receivedFriendRequests   Friendship[] @relation("FriendAddressee")
+}
+
+model UserStats {
+  id            String @id @default(uuid())
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id])
+  gamesPlayed   Int    @default(0)
+  wins          Int    @default(0)
+  losses        Int    @default(0)
+  captures      Int    @default(0)
+  totalTurns    Int    @default(0)
+  totalBorneOff Int    @default(0)
+  resignations  Int    @default(0)
+  disconnects   Int    @default(0)
+  currentStreak Int    @default(0)
+  bestStreak    Int    @default(0)
+}
+
+model Game {
+  id           String    @id @default(uuid())
+  status       String    @default("active")
+  stateJson    String
+  player1Id    String
+  player2Id    String?
+  winnerId     String?
+  isAiGame     Boolean   @default(false)
+  aiDifficulty String?
+  totalTurns   Int       @default(0)
+  totalCaptures Int      @default(0)
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+
+  player1 User  @relation("GamePlayer1", fields: [player1Id], references: [id])
+  player2 User? @relation("GamePlayer2", fields: [player2Id], references: [id])
+  winner  User? @relation("GameWinner", fields: [winnerId], references: [id])
+}
+
+model Friendship {
+  id          String   @id @default(uuid())
+  requesterId String
+  addresseeId String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+
+  requester User @relation("FriendRequester", fields: [requesterId], references: [id])
+  addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id])
+
+  @@unique([requesterId, addresseeId])
+}
