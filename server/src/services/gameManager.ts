@@ -150,17 +150,27 @@ export class GameManager {
     const state = game.state;
     const captures = state.moveLog.filter(l => l.move?.type === 'capture').length;
 
-    await this.prisma.game.update({
-      where: { id: game.dbGameId },
-      data: {
-        status: 'completed',
-        stateJson: JSON.stringify(state),
-        winnerId: game.players[winner].userId,
-        totalTurns: state.turnNumber,
-        totalCaptures: captures,
-        endedAt: new Date(),
-      },
-    });
+    // For AI games, the AI player has no real user — don't set winnerId to
+    // a fake 'ai-player' id or it will violate the foreign key constraint.
+    const winnerUserId = (game.isAiGame && winner === game.aiPlayer)
+      ? null
+      : game.players[winner].userId;
+
+    try {
+      await this.prisma.game.update({
+        where: { id: game.dbGameId },
+        data: {
+          status: 'completed',
+          stateJson: JSON.stringify(state),
+          winnerId: winnerUserId,
+          totalTurns: state.turnNumber,
+          totalCaptures: captures,
+          endedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      console.error('[endGame] Failed to persist game:', err); // TODO: remove
+    }
 
     // Update stats for both players
     for (const pid of ['player1', 'player2'] as PlayerId[]) {
@@ -176,49 +186,53 @@ export class GameManager {
       ).length;
       const resigned = reason === 'resign' && pid !== winner;
 
-      await this.prisma.userStats.upsert({
-        where: { userId: player.userId },
-        create: {
-          userId: player.userId,
-          gamesPlayed: 1,
-          wins: isWinner ? 1 : 0,
-          losses: isWinner ? 0 : 1,
-          captures: playerCaptures,
-          totalTurns: state.turnNumber,
-          totalBorneOff: borneOff,
-          resignations: resigned ? 1 : 0,
-          currentStreak: isWinner ? 1 : 0,
-          bestStreak: isWinner ? 1 : 0,
-        },
-        update: {
-          gamesPlayed: { increment: 1 },
-          wins: { increment: isWinner ? 1 : 0 },
-          losses: { increment: isWinner ? 0 : 1 },
-          captures: { increment: playerCaptures },
-          totalTurns: { increment: state.turnNumber },
-          totalBorneOff: { increment: borneOff },
-          resignations: { increment: resigned ? 1 : 0 },
-          currentStreak: isWinner ? { increment: 1 } : 0,
-          bestStreak: isWinner
-            ? {
-                // We can't do conditional max in prisma easily, so we handle it separately
-                increment: 0,
-              }
-            : undefined,
-        },
-      });
-
-      // Update bestStreak separately
-      if (isWinner) {
-        const stats = await this.prisma.userStats.findUnique({
+      try {
+        await this.prisma.userStats.upsert({
           where: { userId: player.userId },
+          create: {
+            userId: player.userId,
+            gamesPlayed: 1,
+            wins: isWinner ? 1 : 0,
+            losses: isWinner ? 0 : 1,
+            captures: playerCaptures,
+            totalTurns: state.turnNumber,
+            totalBorneOff: borneOff,
+            resignations: resigned ? 1 : 0,
+            currentStreak: isWinner ? 1 : 0,
+            bestStreak: isWinner ? 1 : 0,
+          },
+          update: {
+            gamesPlayed: { increment: 1 },
+            wins: { increment: isWinner ? 1 : 0 },
+            losses: { increment: isWinner ? 0 : 1 },
+            captures: { increment: playerCaptures },
+            totalTurns: { increment: state.turnNumber },
+            totalBorneOff: { increment: borneOff },
+            resignations: { increment: resigned ? 1 : 0 },
+            currentStreak: isWinner ? { increment: 1 } : 0,
+            bestStreak: isWinner
+              ? {
+                  // We can't do conditional max in prisma easily, so we handle it separately
+                  increment: 0,
+                }
+              : undefined,
+          },
         });
-        if (stats && stats.currentStreak > stats.bestStreak) {
-          await this.prisma.userStats.update({
+
+        // Update bestStreak separately
+        if (isWinner) {
+          const stats = await this.prisma.userStats.findUnique({
             where: { userId: player.userId },
-            data: { bestStreak: stats.currentStreak },
           });
+          if (stats && stats.currentStreak > stats.bestStreak) {
+            await this.prisma.userStats.update({
+              where: { userId: player.userId },
+              data: { bestStreak: stats.currentStreak },
+            });
+          }
         }
+      } catch (err) {
+        console.error(`[endGame] Failed to update stats for ${player.userId}:`, err); // TODO: remove
       }
     }
 

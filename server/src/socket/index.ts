@@ -9,7 +9,7 @@ import { LobbyManager } from '../services/lobbyManager.js';
 import { registerQueueHandlers } from './handlers/queue.js';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
-import type { ClientToServerEvents, ServerToClientEvents } from '@sennet/game-engine';
+import { getLegalMoves, type ClientToServerEvents, type ServerToClientEvents } from '@sennet/game-engine';
 
 export interface AuthenticatedSocket extends Socket<ClientToServerEvents, ServerToClientEvents> {
   data: {
@@ -97,11 +97,28 @@ export function setupSocketIO(
     if (activeGame) {
       const playerId = gameManager.getPlayerIdForUser(activeGame, userId);
       if (playerId) {
-        console.log(`[socket] Reconnect: user=${userId} → game=${activeGame.gameId} as ${playerId}`); // TODO: remove
+        console.log(`[socket] Reconnect: user=${userId} → game=${activeGame.gameId} as ${playerId} turnPhase=${activeGame.state.turnPhase}`); // TODO: remove
         gameManager.reconnectPlayer(activeGame, userId, socket.id);
         socket.join(activeGame.gameId);
 
         const opponent = playerId === 'player1' ? activeGame.players.player2 : activeGame.players.player1;
+
+        // If the game is in move phase and it's this player's turn, resend
+        // GAME_ROLL_RESULT first so the client has the legal moves.
+        if (
+          activeGame.state.phase === 'playing' &&
+          activeGame.state.turnPhase === 'move' &&
+          activeGame.state.currentPlayer === playerId &&
+          activeGame.state.currentRoll !== null
+        ) {
+          const moves = getLegalMoves(activeGame.state, playerId, activeGame.state.currentRoll);
+          socket.emit('GAME_ROLL_RESULT', {
+            playerId,
+            value: activeGame.state.currentRoll,
+            legalMoves: moves,
+          });
+        }
+
         socket.emit('GAME_STATE', {
           gameState: activeGame.state,
           yourPlayer: playerId,

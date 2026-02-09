@@ -98,7 +98,7 @@ export function GameView() {
         <div className="player-info you">
           <div className="player-dot" style={{ background: user?.houseColor ?? '#D4AF37' }} />
           <span>{user?.displayName ?? 'You'}</span>
-          <span className="borne-count">{yourBorneOff}/5</span>
+          <span className="borne-count">{yourBorneOff}/5 exited</span>
         </div>
         <div className="turn-indicator">
           {gameState.phase === 'initial_roll' ? (
@@ -114,7 +114,7 @@ export function GameView() {
         <div className="player-info opponent">
           <div className="player-dot" style={{ background: opponentColor || '#8B4513' }} />
           <span>{opponentName || 'Opponent'}</span>
-          <span className="borne-count">{opponentBorneOff}/5</span>
+          <span className="borne-count">{opponentBorneOff}/5 exited</span>
         </div>
       </div>
 
@@ -175,7 +175,7 @@ export function GameView() {
           <div className="event-notice trap">Waters of Chaos — piece washed back!</div>
         )}
         {lastEvent === 'bear_off' && (
-          <div className="event-notice good">Piece borne off!</div>
+          <div className="event-notice good">Piece exited the board!</div>
         )}
         {lastEvent === 'capture' && (
           <div className="event-notice good">Capture! Positions swapped.</div>
@@ -183,7 +183,7 @@ export function GameView() {
 
         {canRoll && (
           <button className="btn-primary roll-btn" onClick={roll}>
-            Roll Sticks
+            Roll Die
           </button>
         )}
 

@@ -30,7 +30,24 @@ export function registerGameHandlers(
     socket.join(game.gameId);
 
     const opponent = playerId === 'player1' ? game.players.player2 : game.players.player1;
-    console.log(`[GAME_REJOIN] Re-sending GAME_STATE to user ${userId} for game ${game.gameId}`); // TODO: remove
+    console.log(`[GAME_REJOIN] Re-sending state to user=${userId} game=${game.gameId} phase=${game.state.phase} turnPhase=${game.state.turnPhase}`); // TODO: remove
+
+    // If the game is in move phase and it's this player's turn, resend
+    // GAME_ROLL_RESULT first so the client has the legal moves.
+    if (
+      game.state.phase === 'playing' &&
+      game.state.turnPhase === 'move' &&
+      game.state.currentPlayer === playerId &&
+      game.state.currentRoll !== null
+    ) {
+      const legalMoves = getLegalMoves(game.state, playerId, game.state.currentRoll);
+      socket.emit('GAME_ROLL_RESULT', {
+        playerId,
+        value: game.state.currentRoll,
+        legalMoves,
+      });
+    }
+
     socket.emit('GAME_STATE', {
       gameState: game.state,
       yourPlayer: playerId,
@@ -121,6 +138,8 @@ export function registerGameHandlers(
 
     const { rollValue, legalMoves, event } = gameManager.doRoll(game);
 
+    console.log(`[GAME_ROLL] user=${userId} rolled=${rollValue} moves=${legalMoves.length} event=${event ?? 'none'} phase=${game.state.turnPhase}`); // TODO: remove
+
     io.to(game.gameId).emit('GAME_ROLL_RESULT', {
       playerId,
       value: rollValue,
@@ -128,10 +147,11 @@ export function registerGameHandlers(
       event,
     });
 
-    // If blocked or rolled 6, send updated state
-    if (event === 'blocked' || event === 'rolled_6') {
-      emitStateToPlayers(io, game, gameManager);
-    }
+    // Always emit GAME_STATE after a roll so clients have the up-to-date
+    // turnPhase ('move' vs 'roll') and currentPlayer. Previously this only
+    // happened for blocked/rolled_6, which caused the UI to freeze after
+    // normal rolls because gameState.turnPhase stayed 'roll' on the client.
+    emitStateToPlayers(io, game, gameManager);
 
     // Check if it's now AI's turn
     if (game.isAiGame && game.state.currentPlayer === game.aiPlayer && game.state.phase === 'playing') {
@@ -176,6 +196,7 @@ export function registerGameHandlers(
 
     try {
       const { state, event } = gameManager.doMove(game, move);
+      console.log(`[GAME_MOVE] user=${userId} ${move.pieceId} ${move.from}→${move.to} type=${move.type} event=${event ?? 'none'} nextPlayer=${state.currentPlayer} extraRolls=${state.extraRolls}`); // TODO: remove
 
       io.to(game.gameId).emit('GAME_MOVE_APPLIED', {
         move,
@@ -213,12 +234,19 @@ export function registerGameHandlers(
     const playerId = gameManager.getPlayerIdForUser(game, userId);
     if (!playerId) return;
 
-    const state = await gameManager.resign(game, playerId);
-    io.to(game.gameId).emit('GAME_OVER', {
-      winner: state.winner!,
-      reason: 'resign',
-      finalState: state,
-    });
+    console.log(`[GAME_RESIGN] user=${userId} playerId=${playerId} game=${game.gameId} isAi=${game.isAiGame}`); // TODO: remove
+
+    try {
+      const state = await gameManager.resign(game, playerId);
+      io.to(game.gameId).emit('GAME_OVER', {
+        winner: state.winner!,
+        reason: 'resign',
+        finalState: state,
+      });
+    } catch (err) {
+      console.error('[GAME_RESIGN] Error during resign:', err); // TODO: remove
+      socket.emit('GAME_ERROR', { code: 'RESIGN_ERROR', message: 'Failed to resign' });
+    }
   }));
 }
 

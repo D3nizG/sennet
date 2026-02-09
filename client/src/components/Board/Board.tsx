@@ -71,7 +71,7 @@ export function Board({
   return (
     <div className="board-container">
       <div className="borne-off-area top">
-        <span className="borne-label">Borne Off</span>
+        <span className="borne-label">Exited</span>
         <div className="borne-pieces">
           {Array.from({ length: p2Off }).map((_, i) => (
             <div key={i} className="piece mini" style={{ background: yourPlayer === 'player2' ? yourColor : opponentColor }} />
@@ -151,12 +151,12 @@ export function Board({
           className="bear-off-target highlighted"
           onClick={() => onSelectSquare(BEAR_OFF_POSITION)}
         >
-          ★ Bear Off ★
+          ★ Exit Board ★
         </div>
       )}
 
       <div className="borne-off-area bottom">
-        <span className="borne-label">Borne Off</span>
+        <span className="borne-label">Exited</span>
         <div className="borne-pieces">
           {Array.from({ length: p1Off }).map((_, i) => (
             <div key={i} className="piece mini" style={{ background: yourPlayer === 'player1' ? yourColor : opponentColor }} />

@@ -26,6 +26,7 @@ export function registerQueueHandlers(
       socketId: socket.id,
       displayName: socket.data.displayName,
       houseColor: socket.data.houseColor,
+      joinedAt: Date.now(),
     });
 
     // Try to match

@@ -81,7 +81,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onGameState = (data: GameStatePayload) => {
-      console.log('[GameProvider] GAME_STATE received, phase:', data.gameState.phase); // TODO: remove
+      console.log('[GameProvider] GAME_STATE received, phase:', data.gameState.phase, 'turnPhase:', data.gameState.turnPhase); // TODO: remove
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
@@ -90,12 +90,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         opponentColor: data.opponentColor,
         isAiGame: data.isAiGame,
         inGame: true,
-        legalMoves: [],
-        lastEvent: null,
+        // Preserve legalMoves when in move phase — they were set by GAME_ROLL_RESULT
+        // which arrives just before this GAME_STATE. Clearing them here was the root
+        // cause of the "freeze after roll" bug: the client had moves but gameState
+        // cleared them before the Board could use them.
+        legalMoves: data.gameState.turnPhase === 'move' ? prev.legalMoves : [],
+        lastEvent: data.gameState.turnPhase === 'move' ? prev.lastEvent : null,
       }));
     };
 
     const onRollResult = (data: GameRollResultPayload) => {
+      console.log('[GameProvider] GAME_ROLL_RESULT value:', data.value, 'moves:', data.legalMoves.length, 'event:', data.event); // TODO: remove
       setGame(prev => ({
         ...prev,
         lastRoll: data.value,
@@ -105,6 +110,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onMoveApplied = (data: GameMoveAppliedPayload) => {
+      console.log('[GameProvider] GAME_MOVE_APPLIED event:', data.event, 'nextPlayer:', data.gameState.currentPlayer, 'turnPhase:', data.gameState.turnPhase); // TODO: remove
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
