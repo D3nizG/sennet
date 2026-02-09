@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
-import type { QueueMatchedPayload, LobbyUpdatePayload, LobbyInvitePayload, AIDifficulty } from '@sennet/game-engine';
+import type { LobbyUpdatePayload, LobbyInvitePayload, AIDifficulty } from '@sennet/game-engine';
 import './LobbyView.css';
 
 export function LobbyView() {
@@ -12,6 +12,7 @@ export function LobbyView() {
   const { socket, connected } = useSocket();
   const { inGame } = useGame();
   const { user } = useAuth();
+  const hasNavigated = useRef(false);
 
   const [queuing, setQueuing] = useState(false);
   const [lobby, setLobby] = useState<LobbyUpdatePayload | null>(null);
@@ -23,9 +24,13 @@ export function LobbyView() {
   const [error, setError] = useState('');
   const [invite, setInvite] = useState<LobbyInvitePayload | null>(null);
 
-  // Navigate to game when matched
+  // Navigate to /game when GameProvider sets inGame (via QUEUE_MATCHED)
   useEffect(() => {
-    if (inGame) navigate('/game');
+    if (inGame && !hasNavigated.current) {
+      hasNavigated.current = true;
+      console.log('[LobbyView] inGame=true → navigating to /game'); // TODO: remove
+      navigate('/game');
+    }
   }, [inGame, navigate]);
 
   // Load friends
@@ -34,15 +39,9 @@ export function LobbyView() {
     api.getPendingRequests().then(d => setPendingRequests(d.requests)).catch(() => {});
   }, []);
 
-  // Socket event listeners
+  // Socket event listeners (lobby-specific only; game events handled by GameProvider)
   useEffect(() => {
     if (!socket) return;
-
-    const onMatched = (_data: QueueMatchedPayload) => {
-      setQueuing(false);
-      setLobby(null);
-      // Game state will come via GAME_STATE event -> navigate
-    };
 
     const onLobbyUpdate = (data: LobbyUpdatePayload) => {
       setLobby(data);
@@ -57,13 +56,11 @@ export function LobbyView() {
       setTimeout(() => setError(''), 4000);
     };
 
-    socket.on('QUEUE_MATCHED', onMatched);
     socket.on('LOBBY_UPDATE', onLobbyUpdate);
     socket.on('LOBBY_INVITE_RECEIVED', onInvite);
     socket.on('GAME_ERROR', onError);
 
     return () => {
-      socket.off('QUEUE_MATCHED', onMatched);
       socket.off('LOBBY_UPDATE', onLobbyUpdate);
       socket.off('LOBBY_INVITE_RECEIVED', onInvite);
       socket.off('GAME_ERROR', onError);

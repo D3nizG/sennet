@@ -79,6 +79,7 @@ export function setupSocketIO(
     const socket = rawSocket as AuthenticatedSocket;
     const userId = socket.data.user.userId;
     userSockets.set(userId, socket.id);
+    console.log(`[socket] Connected: user=${userId} socket=${socket.id}`); // TODO: remove
 
     // Rate-limit wrapper
     const withRateLimit = (handler: (...args: any[]) => void) => {
@@ -96,6 +97,7 @@ export function setupSocketIO(
     if (activeGame) {
       const playerId = gameManager.getPlayerIdForUser(activeGame, userId);
       if (playerId) {
+        console.log(`[socket] Reconnect: user=${userId} → game=${activeGame.gameId} as ${playerId}`); // TODO: remove
         gameManager.reconnectPlayer(activeGame, userId, socket.id);
         socket.join(activeGame.gameId);
 
@@ -116,6 +118,7 @@ export function setupSocketIO(
     registerGameHandlers(socket, io, gameManager, withRateLimit);
 
     socket.on('disconnect', () => {
+      console.log(`[socket] Disconnected: user=${userId}`); // TODO: remove
       userSockets.delete(userId);
       queueManager.leaveBySocket(socket.id);
       lobbyManager.removeUser(userId);

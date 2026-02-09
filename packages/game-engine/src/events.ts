@@ -87,6 +87,8 @@ export interface ClientToServerEvents {
   GAME_ROLL: () => void;
   GAME_MOVE: (data: { pieceId: string; toSquare: number }) => void;
   GAME_RESIGN: () => void;
+  GAME_REJOIN: () => void;
+  GAME_LEAVE: () => void;
   START_AI_GAME: (data: { difficulty: AIDifficulty }) => void;
 }
 

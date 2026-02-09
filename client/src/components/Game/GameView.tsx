@@ -4,7 +4,6 @@ import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
 import { Board } from '../Board/Board';
 import { BEAR_OFF_POSITION } from '@sennet/game-engine';
-import type { PlayerId } from '@sennet/game-engine';
 import './GameView.css';
 
 export function GameView() {
@@ -17,8 +16,23 @@ export function GameView() {
     gameState, yourPlayer, opponentName, opponentColor,
     legalMoves, lastRoll, lastEvent, gameOver,
     initialRolls, inGame, isAiGame,
-    roll, move, resign, resetGame,
+    roll, move, resign, resetGame, requestRejoin,
   } = game;
+
+  // On mount, request rejoin from server in case we refreshed
+  useEffect(() => {
+    if (!gameState && !inGame) {
+      console.log('[GameView] No game state on mount, requesting rejoin'); // TODO: remove
+      requestRejoin();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Log when GameView renders with valid state
+  useEffect(() => {
+    if (gameState && yourPlayer) {
+      console.log('[GameView] Rendering with gameState, phase:', gameState.phase, 'yourPlayer:', yourPlayer); // TODO: remove
+    }
+  }, [gameState, yourPlayer]);
 
   // Clear selection when legal moves change
   useEffect(() => {
@@ -40,7 +54,18 @@ export function GameView() {
     navigate('/');
   }, [resetGame, navigate]);
 
-  // Not in a game — redirect
+  // Waiting for game state (matched but state hasn't arrived yet)
+  if (inGame && (!gameState || !yourPlayer)) {
+    return (
+      <div className="game-view">
+        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+          <p>Loading game...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not in a game — no active game on server either
   if (!gameState || !yourPlayer) {
     return (
       <div className="game-view">

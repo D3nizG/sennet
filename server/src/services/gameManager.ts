@@ -230,6 +230,11 @@ export class GameManager {
     }
   }
 
+  /** Remove user→game mapping (e.g. after game over + client leave). */
+  clearUserMapping(userId: string): void {
+    this.userToGame.delete(userId);
+  }
+
   /** Update socket ID for a reconnecting player. */
   reconnectPlayer(game: ActiveGame, userId: string, newSocketId: string): PlayerId | null {
     for (const pid of ['player1', 'player2'] as PlayerId[]) {

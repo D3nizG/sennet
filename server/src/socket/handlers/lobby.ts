@@ -110,6 +110,7 @@ export function registerLobbyHandlers(
 
     try {
       const game = await gameManager.createGame(lobby.host, lobby.guest);
+      console.log(`[LOBBY_START] Game created: ${game.gameId} host=${lobby.host.userId} guest=${lobby.guest.userId}`); // TODO: remove
 
       // Move sockets from lobby room to game room
       const s1 = io.sockets.sockets.get(lobby.host.socketId);

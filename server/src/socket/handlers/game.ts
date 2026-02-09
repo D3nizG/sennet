@@ -14,6 +14,46 @@ export function registerGameHandlers(
 ): void {
   const userId = socket.data.user.userId;
 
+  // ── Rejoin (client requests current game state after refresh) ────────
+  socket.on('GAME_REJOIN', withRateLimit(() => {
+    const game = gameManager.getByUser(userId);
+    if (!game) {
+      console.log(`[GAME_REJOIN] No active game for user ${userId}`); // TODO: remove
+      return;
+    }
+
+    const playerId = gameManager.getPlayerIdForUser(game, userId);
+    if (!playerId) return;
+
+    // Update socket mapping and re-join room
+    gameManager.reconnectPlayer(game, userId, socket.id);
+    socket.join(game.gameId);
+
+    const opponent = playerId === 'player1' ? game.players.player2 : game.players.player1;
+    console.log(`[GAME_REJOIN] Re-sending GAME_STATE to user ${userId} for game ${game.gameId}`); // TODO: remove
+    socket.emit('GAME_STATE', {
+      gameState: game.state,
+      yourPlayer: playerId,
+      opponentName: opponent.displayName,
+      opponentColor: opponent.houseColor,
+      isAiGame: game.isAiGame,
+    });
+  }));
+
+  // ── Leave (client explicitly leaves/resets after game over) ──────────
+  socket.on('GAME_LEAVE', withRateLimit(() => {
+    const game = gameManager.getByUser(userId);
+    if (!game) return;
+
+    // Only allow leaving if the game is finished
+    if (game.state.phase === 'finished') {
+      console.log(`[GAME_LEAVE] User ${userId} left finished game ${game.gameId}`); // TODO: remove
+      socket.leave(game.gameId);
+      // Cleanup is already done by endGame; just clear the user mapping if still present
+      gameManager.clearUserMapping(userId);
+    }
+  }));
+
   // ── Start AI game ──────────────────────────────────────────────────────
   socket.on('START_AI_GAME', withRateLimit(async (data: unknown) => {
     const parsed = StartAIGameSchema.safeParse(data);

@@ -37,6 +37,7 @@ export function registerQueueHandlers(
 
       try {
         const game = await gameManager.createGame(p1, p2);
+        console.log(`[QUEUE] Game created: ${game.gameId} p1=${p1.userId} p2=${p2.userId}`); // TODO: remove
 
         // Join both sockets to the game room
         const s1 = io.sockets.sockets.get(p1.socketId);
@@ -99,10 +100,12 @@ export async function startInitialRolls(
   if (game.state.phase === 'playing') {
     // Send full game state
     await delay(500);
+    console.log(`[initialRolls] Decided! Sending GAME_STATE for game ${gameId}`); // TODO: remove
     for (const pid of ['player1', 'player2'] as PlayerId[]) {
       const player = game.players[pid];
       const opponent = pid === 'player1' ? game.players.player2 : game.players.player1;
       const sock = io.sockets.sockets.get(player.socketId);
+      console.log(`[initialRolls] Emitting GAME_STATE to ${pid} (socket=${player.socketId}, connected=${!!sock})`); // TODO: remove
       sock?.emit('GAME_STATE', {
         gameState: game.state,
         yourPlayer: pid,
