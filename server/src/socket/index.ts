@@ -9,6 +9,7 @@ import { LobbyManager } from '../services/lobbyManager.js';
 import { registerQueueHandlers } from './handlers/queue.js';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
+import { TurnRunner } from '../services/turnRunner.js';
 import { getLegalMoves, type ClientToServerEvents, type ServerToClientEvents } from '@sennet/game-engine';
 
 export interface AuthenticatedSocket extends Socket<ClientToServerEvents, ServerToClientEvents> {
@@ -45,6 +46,7 @@ export function setupSocketIO(
   const gameManager = new GameManager(prisma);
   const queueManager = new QueueManager();
   const lobbyManager = new LobbyManager();
+  const turnRunner  = new TurnRunner(io, gameManager);
 
   // Track userId → socketId for messaging
   const userSockets = new Map<string, string>();
@@ -97,11 +99,9 @@ export function setupSocketIO(
     if (activeGame) {
       const playerId = gameManager.getPlayerIdForUser(activeGame, userId);
       if (playerId) {
-        console.log(`[socket] Reconnect: user=${userId} → game=${activeGame.gameId} as ${playerId} turnPhase=${activeGame.state.turnPhase}`); // TODO: remove
+        console.log(`[socket] Reconnect: user=${userId} → game=${activeGame.gameId} as ${playerId} turnPhase=${activeGame.state.turnPhase}`);
         gameManager.reconnectPlayer(activeGame, userId, socket.id);
         socket.join(activeGame.gameId);
-
-        const opponent = playerId === 'player1' ? activeGame.players.player2 : activeGame.players.player1;
 
         // If the game is in move phase and it's this player's turn, resend
         // GAME_ROLL_RESULT first so the client has the legal moves.
@@ -119,20 +119,15 @@ export function setupSocketIO(
           });
         }
 
-        socket.emit('GAME_STATE', {
-          gameState: activeGame.state,
-          yourPlayer: playerId,
-          opponentName: opponent.displayName,
-          opponentColor: opponent.houseColor,
-          isAiGame: activeGame.isAiGame,
-        });
+        // Send GAME_STATE with moveDeadline so client can resume countdown
+        turnRunner.emitStateToSocket(activeGame, playerId, socket.id);
       }
     }
 
     // Register event handlers
-    registerQueueHandlers(socket, io, queueManager, gameManager, userSockets, withRateLimit);
-    registerLobbyHandlers(socket, io, lobbyManager, gameManager, userSockets, withRateLimit);
-    registerGameHandlers(socket, io, gameManager, withRateLimit);
+    registerQueueHandlers(socket, io, queueManager, gameManager, userSockets, turnRunner, withRateLimit);
+    registerLobbyHandlers(socket, io, lobbyManager, gameManager, userSockets, turnRunner, withRateLimit);
+    registerGameHandlers(socket, io, gameManager, turnRunner, withRateLimit);
 
     socket.on('disconnect', () => {
       console.log(`[socket] Disconnected: user=${userId}`); // TODO: remove

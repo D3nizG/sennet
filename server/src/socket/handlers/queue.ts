@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import type { AuthenticatedSocket } from '../index.js';
 import { QueueManager } from '../../services/queueManager.js';
 import { GameManager } from '../../services/gameManager.js';
+import { TurnRunner } from '../../services/turnRunner.js';
 import { PlayerId } from '@sennet/game-engine';
 
 export function registerQueueHandlers(
@@ -10,6 +11,7 @@ export function registerQueueHandlers(
   queueManager: QueueManager,
   gameManager: GameManager,
   userSockets: Map<string, string>,
+  turnRunner: TurnRunner,
   withRateLimit: (fn: (...args: any[]) => void) => (...args: any[]) => void,
 ): void {
   const userId = socket.data.user.userId;
@@ -38,7 +40,7 @@ export function registerQueueHandlers(
 
       try {
         const game = await gameManager.createGame(p1, p2);
-        console.log(`[QUEUE] Game created: ${game.gameId} p1=${p1.userId} p2=${p2.userId}`); // TODO: remove
+        console.log(`[QUEUE] Game created: ${game.gameId} p1=${p1.userId} p2=${p2.userId}`);
 
         // Join both sockets to the game room
         const s1 = io.sockets.sockets.get(p1.socketId);
@@ -58,8 +60,8 @@ export function registerQueueHandlers(
           yourPlayer: 'player2' as PlayerId,
         });
 
-        // Start initial roll ceremony
-        startInitialRolls(io, gameManager, game.gameId);
+        // Start user-driven faceoff via TurnRunner
+        turnRunner.startFaceoff(game.gameId);
       } catch (err) {
         console.error('Match creation error:', err);
         socket.emit('GAME_ERROR', { code: 'MATCH_ERROR', message: 'Failed to create match' });
@@ -70,50 +72,4 @@ export function registerQueueHandlers(
   socket.on('QUEUE_LEAVE', withRateLimit(() => {
     queueManager.leave(userId);
   }));
-}
-
-/** Run the initial roll ceremony until one player exclusively rolls a 1. */
-export async function startInitialRolls(
-  io: Server,
-  gameManager: GameManager,
-  gameId: string,
-): Promise<void> {
-  const game = gameManager.get(gameId);
-  if (!game) return;
-
-  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-  let maxRounds = 20;
-  while (!game.state.initialRolls.decided && maxRounds-- > 0) {
-    await delay(800); // small delay between rounds for dramatic effect
-
-    const result = gameManager.doInitialRoll(game);
-
-    io.to(gameId).emit('GAME_INITIAL_ROLL', {
-      player1Roll: result.p1Roll,
-      player2Roll: result.p2Roll,
-      decided: result.decided,
-      firstPlayer: result.firstPlayer,
-      round: game.state.initialRolls.rounds.length,
-    });
-  }
-
-  if (game.state.phase === 'playing') {
-    // Send full game state
-    await delay(500);
-    console.log(`[initialRolls] Decided! Sending GAME_STATE for game ${gameId}`); // TODO: remove
-    for (const pid of ['player1', 'player2'] as PlayerId[]) {
-      const player = game.players[pid];
-      const opponent = pid === 'player1' ? game.players.player2 : game.players.player1;
-      const sock = io.sockets.sockets.get(player.socketId);
-      console.log(`[initialRolls] Emitting GAME_STATE to ${pid} (socket=${player.socketId}, connected=${!!sock})`); // TODO: remove
-      sock?.emit('GAME_STATE', {
-        gameState: game.state,
-        yourPlayer: pid,
-        opponentName: opponent.displayName,
-        opponentColor: opponent.houseColor,
-        isAiGame: game.isAiGame,
-      });
-    }
-  }
 }

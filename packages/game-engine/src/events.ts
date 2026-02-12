@@ -29,6 +29,10 @@ export interface GameStatePayload {
   opponentName: string;
   opponentColor: string;
   isAiGame: boolean;
+  moveDeadline?: number | null;           // (unused this iteration — kept for compat)
+  rollDeadlineAt?: number | null;         // epoch ms — when server auto-rolls (5s timer)
+  faceoffRolls?: { player1: number | null; player2: number | null } | null;
+  faceoffRound?: number;
 }
 
 export interface GameRollResultPayload {
@@ -42,6 +46,7 @@ export interface GameMoveAppliedPayload {
   move: Move;
   gameState: GameState;
   event?: string;
+  autoPlayed?: boolean;           // true when server auto-moved due to timeout
 }
 
 export interface GameErrorPayload {
@@ -51,7 +56,7 @@ export interface GameErrorPayload {
 
 export interface GameOverPayload {
   winner: PlayerId;
-  reason: 'all_pieces_off' | 'resign' | 'disconnect';
+  reason: 'all_pieces_off' | 'resign' | 'disconnect' | 'timeout';
   finalState: GameState;
 }
 

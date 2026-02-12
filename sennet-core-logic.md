@@ -47,3 +47,14 @@ Mandatory Moves: If no forward move is possible, you must move backward.
 Jail (Blocked): If no forward or backward move exists, the turn is skipped (Trigger "Jail Cell" UI).
 
 Bearing Off: Pieces can exit the board from the final row (20-29) individually with an exact roll to reach "Square 30".
+
+7. Multiplayer Turn Timers (Online Only)
+These timer rules apply only to Multiplayer/Online games. No timers are used in local single-player vs AI.
+
+Move Timer: After a player rolls (and movement is possible), they have 24 seconds to choose and execute a move.
+
+Auto-Move on Timeout: If the 24 seconds expire before the player moves, the server will select and execute a random legal move from that player’s available moves for the current roll.
+
+No-Move Exception: If no legal move exists (forward or backward), the turn is skipped as normal (Jail/Blocked). This does not trigger an auto-move.
+
+Auto-Resign: If a player times out (i.e., triggers an auto-move due to inactivity) for 3 consecutive move decisions, they automatically resign the game.

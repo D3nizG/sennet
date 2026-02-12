@@ -14,6 +14,14 @@ export interface ActiveGame {
   aiDifficulty?: string;
   aiPlayer?: PlayerId;
   dbGameId: string;
+  // Timer state (managed by TurnRunner)
+  moveDeadline: number | null;             // (unused this iteration — kept for compat)
+  timeoutStreak: Record<PlayerId, number>; // (unused this iteration — kept for compat)
+  // Roll timer state (5s auto-roll)
+  rollDeadlineAt: number | null;           // epoch ms — when server auto-rolls
+  // Faceoff state (user-driven)
+  faceoffRolls: { player1: number | null; player2: number | null };
+  faceoffRound: number;
 }
 
 export class GameManager {
@@ -53,6 +61,11 @@ export class GameManager {
       aiDifficulty,
       aiPlayer: isAi ? 'player2' : undefined,
       dbGameId: dbGame.id,
+      moveDeadline: null,
+      timeoutStreak: { player1: 0, player2: 0 },
+      rollDeadlineAt: null,
+      faceoffRolls: { player1: null, player2: null },
+      faceoffRound: 0,
     };
 
     this.games.set(gameId, active);

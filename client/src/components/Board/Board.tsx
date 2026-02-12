@@ -35,6 +35,10 @@ const SQUARE_TOOLTIPS: Record<number, string> = {
   29: 'Safe Square — Cannot be captured',
 };
 
+// Feature flag: set to true to enable pulsing animation on selectable pieces.
+// Currently disabled (unrequested UI feature).
+const ENABLE_PULSE = false;
+
 export function Board({
   gameState, yourPlayer, opponentColor, yourColor,
   legalMoves, selectedPiece, onSelectPiece, onSelectSquare,
@@ -128,7 +132,7 @@ export function Board({
                     <div
                       className={[
                         'piece',
-                        isSelectable && 'selectable',
+                        ENABLE_PULSE && isSelectable && 'selectable',
                         isSelected && 'piece-selected',
                       ].filter(Boolean).join(' ')}
                       style={{ background: pieceColor }}

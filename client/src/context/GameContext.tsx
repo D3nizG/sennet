@@ -22,6 +22,11 @@ interface GameInfo {
   initialRolls: InitialRollPayload[];
   inGame: boolean;
   gameId: string | null;
+  moveDeadline: number | null;     // (unused this iteration)
+  lastAutoPlayed: boolean;          // (unused this iteration)
+  rollDeadlineAt: number | null;   // epoch ms — server auto-roll deadline (5s)
+  faceoffRolls: { player1: number | null; player2: number | null } | null;
+  faceoffRound: number;
 }
 
 interface GameContextValue extends GameInfo {
@@ -45,6 +50,11 @@ const INITIAL_STATE: GameInfo = {
   initialRolls: [],
   inGame: false,
   gameId: null,
+  moveDeadline: null,
+  lastAutoPlayed: false,
+  rollDeadlineAt: null,
+  faceoffRolls: null,
+  faceoffRound: 0,
 };
 
 const GameContext = createContext<GameContextValue>({
@@ -81,7 +91,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onGameState = (data: GameStatePayload) => {
-      console.log('[GameProvider] GAME_STATE received, phase:', data.gameState.phase, 'turnPhase:', data.gameState.turnPhase); // TODO: remove
+      console.log('[GameProvider] GAME_STATE received, phase:', data.gameState.phase, 'turnPhase:', data.gameState.turnPhase, 'rollDeadlineAt:', data.rollDeadlineAt, 'faceoffRound:', data.faceoffRound);
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
@@ -91,11 +101,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         isAiGame: data.isAiGame,
         inGame: true,
         // Preserve legalMoves when in move phase — they were set by GAME_ROLL_RESULT
-        // which arrives just before this GAME_STATE. Clearing them here was the root
-        // cause of the "freeze after roll" bug: the client had moves but gameState
-        // cleared them before the Board could use them.
+        // which arrives just before this GAME_STATE.
         legalMoves: data.gameState.turnPhase === 'move' ? prev.legalMoves : [],
         lastEvent: data.gameState.turnPhase === 'move' ? prev.lastEvent : null,
+        moveDeadline: data.moveDeadline ?? null,
+        rollDeadlineAt: data.rollDeadlineAt ?? null,
+        faceoffRolls: data.faceoffRolls ?? null,
+        faceoffRound: data.faceoffRound ?? 0,
       }));
     };
 
@@ -110,13 +122,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onMoveApplied = (data: GameMoveAppliedPayload) => {
-      console.log('[GameProvider] GAME_MOVE_APPLIED event:', data.event, 'nextPlayer:', data.gameState.currentPlayer, 'turnPhase:', data.gameState.turnPhase); // TODO: remove
+      console.log('[GameProvider] GAME_MOVE_APPLIED event:', data.event, 'nextPlayer:', data.gameState.currentPlayer);
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
         legalMoves: [],
         lastRoll: null,
         lastEvent: data.event ?? null,
+        moveDeadline: null,
+        rollDeadlineAt: null,
+        lastAutoPlayed: data.autoPlayed ?? false,
       }));
     };
 
@@ -127,6 +142,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         gameOver: data,
         legalMoves: [],
         inGame: false,
+        moveDeadline: null,
+        rollDeadlineAt: null,
+        faceoffRolls: null,
       }));
     };
 

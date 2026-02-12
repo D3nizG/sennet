@@ -232,6 +232,104 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Move Timer Bar */
+.timer-bar {
+  position: relative;
+  height: 28px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.timer-bar-fill {
+  position: absolute;
+  inset: 0;
+  background: rgba(212, 175, 55, 0.25);
+  transition: width 0.5s linear;
+  border-radius: 8px;
+}
+
+.timer-bar.urgent .timer-bar-fill {
+  background: rgba(192, 57, 43, 0.3);
+}
+
+.timer-bar-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.timer-bar.urgent .timer-bar-text {
+  color: var(--danger);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Faceoff */
+.faceoff-subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.faceoff-waiting {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.faceoff-current-round {
+  margin: 0.75rem 0;
+}
+
+.faceoff-round-label {
+  font-weight: 600;
+  color: var(--gold-light);
+  margin-bottom: 0.4rem;
+}
+
+.faceoff-roll-status {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.faceoff-roll-chip {
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.faceoff-roll-chip.rolled {
+  background: rgba(39, 174, 96, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(39, 174, 96, 0.4);
+}
+
+.faceoff-roll-chip.waiting {
+  background: rgba(168, 178, 193, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(168, 178, 193, 0.3);
+}
+
+.faceoff-roll-btn {
+  margin-top: 0.75rem;
+}
+
 /* Legend */
 .legend h4 {
   color: var(--text-muted);

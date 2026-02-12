@@ -2,8 +2,8 @@ import { Server } from 'socket.io';
 import type { AuthenticatedSocket } from '../index.js';
 import { LobbyManager } from '../../services/lobbyManager.js';
 import { GameManager } from '../../services/gameManager.js';
+import { TurnRunner } from '../../services/turnRunner.js';
 import { LobbyJoinSchema, LobbyInviteSchema } from '../events.js';
-import { startInitialRolls } from './queue.js';
 import { PlayerId } from '@sennet/game-engine';
 
 export function registerLobbyHandlers(
@@ -12,6 +12,7 @@ export function registerLobbyHandlers(
   lobbyManager: LobbyManager,
   gameManager: GameManager,
   userSockets: Map<string, string>,
+  turnRunner: TurnRunner,
   withRateLimit: (fn: (...args: any[]) => void) => (...args: any[]) => void,
 ): void {
   const userId = socket.data.user.userId;
@@ -141,7 +142,7 @@ export function registerLobbyHandlers(
       });
 
       lobbyManager.removeLobby(lobby.id);
-      startInitialRolls(io, gameManager, game.gameId);
+      turnRunner.startFaceoff(game.gameId);
     } catch (err) {
       console.error('Lobby start error:', err);
       socket.emit('GAME_ERROR', { code: 'GAME_CREATE_ERROR', message: 'Failed to start game' });
