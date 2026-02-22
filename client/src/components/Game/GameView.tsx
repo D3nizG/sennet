@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +11,11 @@ export function GameView() {
   const { user } = useAuth();
   const game = useGame();
   const [selectedPiece, setSelectedPiece] = useState<string | null>(null);
-  const [activePanelTab, setActivePanelTab] = useState<'log' | 'chat'>('log');
+  const [activePanelTab, setActivePanelTab] = useState<'log' | 'chat' | 'help'>('log');
+  const [showResignConfirm, setShowResignConfirm] = useState(false);
+  const [rollingPreview, setRollingPreview] = useState<number | null>(null);
+  const rollAnimIntervalRef = useRef<number | null>(null);
+  const rollAnimTimeoutRef = useRef<number | null>(null);
 
   const {
     gameState, yourPlayer, opponentName, opponentColor,
@@ -131,6 +135,70 @@ export function GameView() {
   );
   const yourBonusRolls = gameState.currentPlayer === yourPlayer ? gameState.extraRolls : 0;
 
+  const clearRollAnimation = useCallback(() => {
+    if (rollAnimIntervalRef.current !== null) {
+      window.clearInterval(rollAnimIntervalRef.current);
+      rollAnimIntervalRef.current = null;
+    }
+    if (rollAnimTimeoutRef.current !== null) {
+      window.clearTimeout(rollAnimTimeoutRef.current);
+      rollAnimTimeoutRef.current = null;
+    }
+  }, []);
+
+  const runRollAnimation = useCallback(() => {
+    clearRollAnimation();
+    setRollingPreview(Math.floor(Math.random() * 6) + 1);
+    rollAnimIntervalRef.current = window.setInterval(() => {
+      setRollingPreview(Math.floor(Math.random() * 6) + 1);
+    }, 80);
+    rollAnimTimeoutRef.current = window.setTimeout(() => {
+      clearRollAnimation();
+      setRollingPreview(null);
+    }, 500);
+  }, [clearRollAnimation]);
+
+  const handleRollAction = useCallback(() => {
+    if (!canRoll && !canFaceoffRoll) return;
+    if (canRoll) runRollAnimation();
+    roll();
+  }, [canRoll, canFaceoffRoll, runRollAnimation, roll]);
+
+  const handleRequestResign = useCallback(() => {
+    setShowResignConfirm(true);
+  }, []);
+
+  const handleCancelResign = useCallback(() => {
+    setShowResignConfirm(false);
+  }, []);
+
+  const handleConfirmResign = useCallback(() => {
+    setShowResignConfirm(false);
+    resign();
+  }, [resign]);
+
+  useEffect(() => {
+    return () => {
+      clearRollAnimation();
+    };
+  }, [clearRollAnimation]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (!canRoll && !canFaceoffRoll) return;
+      event.preventDefault();
+      handleRollAction();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [canRoll, canFaceoffRoll, handleRollAction]);
+
   const renderBorneCount = (count: number, color: string) => (
     <span className="borne-count" aria-label={`${count} of 5 borne off`}>
       {Array.from({ length: 5 }).map((_, idx) => (
@@ -171,20 +239,6 @@ export function GameView() {
           {!isFaceoff && renderBorneCount(opponentBorneOff, opponentColor || '#8B4513')}
         </div>
       </div>
-
-      {/* Special Squares Legend */}
-      {!isFaceoff && (
-        <div className="legend card">
-          <h4>Special Squares</h4>
-          <div className="legend-grid">
-            <span className="legend-item"><span className="sq-sample danger">13</span> House of Netting (trap)</span>
-            <span className="legend-item"><span className="sq-sample bonus">14</span> +1 extra roll</span>
-            <span className="legend-item"><span className="sq-sample bonus">25</span> +1 extra roll</span>
-            <span className="legend-item"><span className="sq-sample danger">26</span> Waters of Chaos</span>
-            <span className="legend-item"><span className="sq-sample safe">27-29</span> Safe squares</span>
-          </div>
-        </div>
-      )}
 
       {/* Roll Timer Bar (multiplayer only, shown for both faceoff and normal rolls) */}
       {timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && (
@@ -242,7 +296,7 @@ export function GameView() {
 
           {/* Roll button for faceoff */}
           {canFaceoffRoll && (
-            <button className="btn-primary roll-btn faceoff-roll-btn" onClick={roll}>
+            <button className="btn-primary roll-btn faceoff-roll-btn" onClick={handleRollAction}>
               Roll Die
             </button>
           )}
@@ -270,20 +324,22 @@ export function GameView() {
       {!isFaceoff && (
         <div className="game-controls">
           <div className="control-primary-row">
-            <div className="control-primary-item">
+            <div className="control-primary-item bonus-item">
               <div className="bonus-roll-display">
                 <span className="bonus-roll-icon">𓋹</span>
                 <span className="bonus-roll-label">: {yourBonusRolls}</span>
               </div>
             </div>
 
-            <div className="control-primary-item">
+            <div className="control-primary-item roll-item">
               <div className="roll-display">
-                <span className={`roll-value${lastRoll === null ? ' empty' : ''}`}>
-                  {lastRoll ?? '—'}
+                <span className={`roll-value${lastRoll === null && rollingPreview === null ? ' empty' : ''}`}>
+                  {rollingPreview ?? lastRoll ?? '—'}
                 </span>
                 <span className="roll-label">
-                  {lastRoll === null
+                  {rollingPreview !== null
+                    ? 'Rolling...'
+                    : lastRoll === null
                     ? 'Waiting for roll'
                     : lastRoll === 6
                       ? 'No move — roll again'
@@ -292,8 +348,8 @@ export function GameView() {
               </div>
             </div>
 
-            <div className="control-primary-item">
-              <button className="btn-primary roll-btn" onClick={roll} disabled={!canRoll}>
+            <div className="control-primary-item action-item">
+              <button className="btn-primary roll-btn" onClick={handleRollAction} disabled={!canRoll}>
                 Roll Die
               </button>
             </div>
@@ -324,6 +380,23 @@ export function GameView() {
         </div>
       )}
 
+      {showResignConfirm && (
+        <div className="confirm-overlay">
+          <div className="confirm-card card">
+            <h3>Confirm Resign</h3>
+            <p>Are you sure you want to resign this game?</p>
+            <div className="confirm-actions">
+              <button className="btn-secondary" onClick={handleCancelResign}>
+                Cancel
+              </button>
+              <button className="btn-danger" onClick={handleConfirmResign}>
+                Resign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Move Log + Chat */}
       {!isFaceoff && (
         <div className="move-log-container card">
@@ -345,9 +418,17 @@ export function GameView() {
               >
                 Chat
               </button>
+              <button
+                className={`panel-tab${activePanelTab === 'help' ? ' active' : ''}`}
+                onClick={() => setActivePanelTab('help')}
+                role="tab"
+                aria-selected={activePanelTab === 'help'}
+              >
+                Help
+              </button>
             </div>
             {gameState.phase === 'playing' && (
-              <button className="btn-danger resign-btn panel-resign-btn" onClick={resign}>
+              <button className="btn-danger resign-btn panel-resign-btn" onClick={handleRequestResign}>
                 Resign
               </button>
             )}
@@ -372,10 +453,21 @@ export function GameView() {
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : activePanelTab === 'chat' ? (
               <div className="chat-placeholder" role="tabpanel">
                 <p>Chat panel placeholder.</p>
                 <p>Live messaging will be added here in a later iteration.</p>
+              </div>
+            ) : (
+              <div className="help-panel" role="tabpanel">
+                <div className="help-list">
+                  <span className="help-item"><span className="sq-sample plain">0</span> Rebirth</span>
+                  <span className="help-item"><span className="sq-sample danger">13</span> House of Netting (Trap)</span>
+                  <span className="help-item"><span className="sq-sample bonus">14</span> Extra Roll: +1 𓋹</span>
+                  <span className="help-item"><span className="sq-sample bonus">25</span> Extra Roll: +1 𓋹</span>
+                  <span className="help-item"><span className="sq-sample danger">26</span> Waters of Chaos (Trap)</span>
+                  <span className="help-item"><span className="sq-sample safe">27-29</span> Safe Squares</span>
+                </div>
               </div>
             )}
           </div>
