@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { GameState, PieceState, Move, PlayerId } from '@sennet/game-engine';
-import { positionToCoords, SPECIAL_SQUARES, BEAR_OFF_POSITION } from '@sennet/game-engine';
+import { SPECIAL_SQUARES } from '@sennet/game-engine';
 import './Board.css';
 
 interface BoardProps {
@@ -66,23 +66,10 @@ export function Board({
     return new Set(legalMoves.map(m => m.pieceId));
   }, [legalMoves]);
 
-  // Borne-off counts
-  const p1Off = gameState.pieces.filter(p => p.owner === 'player1' && p.position === BEAR_OFF_POSITION).length;
-  const p2Off = gameState.pieces.filter(p => p.owner === 'player2' && p.position === BEAR_OFF_POSITION).length;
-
   const rows = [0, 1, 2];
 
   return (
     <div className="board-container">
-      <div className="borne-off-area top">
-        <span className="borne-label">Exited</span>
-        <div className="borne-pieces">
-          {Array.from({ length: p2Off }).map((_, i) => (
-            <div key={i} className="piece mini" style={{ background: yourPlayer === 'player2' ? yourColor : opponentColor }} />
-          ))}
-        </div>
-      </div>
-
       <div className="board">
         {rows.map(row => (
           <div key={row} className="board-row">
@@ -149,24 +136,6 @@ export function Board({
         ))}
       </div>
 
-      {/* Bear-off highlight target */}
-      {highlightedSquares.has(BEAR_OFF_POSITION) && (
-        <div
-          className="bear-off-target highlighted"
-          onClick={() => onSelectSquare(BEAR_OFF_POSITION)}
-        >
-          ★ Exit Board ★
-        </div>
-      )}
-
-      <div className="borne-off-area bottom">
-        <span className="borne-label">Exited</span>
-        <div className="borne-pieces">
-          {Array.from({ length: p1Off }).map((_, i) => (
-            <div key={i} className="piece mini" style={{ background: yourPlayer === 'player1' ? yourColor : opponentColor }} />
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

@@ -103,7 +103,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         // Preserve legalMoves when in move phase — they were set by GAME_ROLL_RESULT
         // which arrives just before this GAME_STATE.
         legalMoves: data.gameState.turnPhase === 'move' ? prev.legalMoves : [],
-        lastEvent: data.gameState.turnPhase === 'move' ? prev.lastEvent : null,
+        // Keep the previous move event visible until the next roll result arrives.
+        lastEvent: data.gameState.phase === 'playing' ? prev.lastEvent : null,
         moveDeadline: data.moveDeadline ?? null,
         rollDeadlineAt: data.rollDeadlineAt ?? null,
         faceoffRolls: data.faceoffRolls ?? null,

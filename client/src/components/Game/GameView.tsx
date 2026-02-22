@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ export function GameView() {
   const { user } = useAuth();
   const game = useGame();
   const [selectedPiece, setSelectedPiece] = useState<string | null>(null);
+  const [activePanelTab, setActivePanelTab] = useState<'log' | 'chat'>('log');
 
   const {
     gameState, yourPlayer, opponentName, opponentColor,
@@ -114,6 +115,34 @@ export function GameView() {
     p => p.owner !== yourPlayer && p.position === BEAR_OFF_POSITION
   ).length;
 
+  const eventNotice = lastEvent === 'blocked'
+    ? { tone: 'blocked', text: 'Blocked! No legal moves — turn skipped.' }
+    : lastEvent === 'house_of_netting'
+      ? { tone: 'trap', text: 'Landed on House of Netting — turn ends!' }
+      : lastEvent === 'waters_of_chaos'
+        ? { tone: 'trap', text: 'Waters of Chaos — piece washed back!' }
+        : lastEvent === 'bear_off'
+          ? { tone: 'good', text: 'Piece exited the board!' }
+          : lastEvent === 'capture'
+            ? { tone: 'good', text: 'Capture! Positions swapped.' }
+            : null;
+  const canBearOffSelected = canMove && !!selectedPiece && legalMoves.some(
+    m => m.pieceId === selectedPiece && m.to === BEAR_OFF_POSITION
+  );
+  const yourBonusRolls = gameState.currentPlayer === yourPlayer ? gameState.extraRolls : 0;
+
+  const renderBorneCount = (count: number, color: string) => (
+    <span className="borne-count" aria-label={`${count} of 5 borne off`}>
+      {Array.from({ length: 5 }).map((_, idx) => (
+        <span
+          key={idx}
+          className={`borne-count-dot${idx < count ? ' filled' : ''}`}
+          style={{ borderColor: color, backgroundColor: idx < count ? color : 'transparent' }}
+        />
+      ))}
+    </span>
+  );
+
   return (
     <div className="game-view">
       {/* Header info */}
@@ -121,7 +150,7 @@ export function GameView() {
         <div className="player-info you">
           <div className="player-dot" style={{ background: user?.houseColor ?? '#D4AF37' }} />
           <span>{user?.displayName ?? 'You'}</span>
-          {!isFaceoff && <span className="borne-count">{yourBorneOff}/5 exited</span>}
+          {!isFaceoff && renderBorneCount(yourBorneOff, user?.houseColor ?? '#D4AF37')}
         </div>
         <div className="turn-indicator">
           {isFaceoff ? (
@@ -139,9 +168,23 @@ export function GameView() {
         <div className="player-info opponent">
           <div className="player-dot" style={{ background: opponentColor || '#8B4513' }} />
           <span>{opponentName || 'Opponent'}</span>
-          {!isFaceoff && <span className="borne-count">{opponentBorneOff}/5 exited</span>}
+          {!isFaceoff && renderBorneCount(opponentBorneOff, opponentColor || '#8B4513')}
         </div>
       </div>
+
+      {/* Special Squares Legend */}
+      {!isFaceoff && (
+        <div className="legend card">
+          <h4>Special Squares</h4>
+          <div className="legend-grid">
+            <span className="legend-item"><span className="sq-sample danger">13</span> House of Netting (trap)</span>
+            <span className="legend-item"><span className="sq-sample bonus">14</span> +1 extra roll</span>
+            <span className="legend-item"><span className="sq-sample bonus">25</span> +1 extra roll</span>
+            <span className="legend-item"><span className="sq-sample danger">26</span> Waters of Chaos</span>
+            <span className="legend-item"><span className="sq-sample safe">27-29</span> Safe squares</span>
+          </div>
+        </div>
+      )}
 
       {/* Roll Timer Bar (multiplayer only, shown for both faceoff and normal rolls) */}
       {timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && (
@@ -226,75 +269,117 @@ export function GameView() {
       {/* Controls */}
       {!isFaceoff && (
         <div className="game-controls">
-          {lastRoll !== null && (
-            <div className="roll-display">
-              <span className="roll-value">{lastRoll}</span>
-              <span className="roll-label">
-                {lastRoll === 6 ? 'No move — roll again' : `Roll: ${lastRoll}`}
-              </span>
+          <div className="control-primary-row">
+            <div className="control-primary-item">
+              <div className="bonus-roll-display">
+                <span className="bonus-roll-icon">𓋹</span>
+                <span className="bonus-roll-label">: {yourBonusRolls}</span>
+              </div>
             </div>
-          )}
 
-          {lastEvent === 'blocked' && (
-            <div className="event-notice blocked">
-              <span className="event-icon">⛓</span> Blocked! No legal moves — turn skipped.
+            <div className="control-primary-item">
+              <div className="roll-display">
+                <span className={`roll-value${lastRoll === null ? ' empty' : ''}`}>
+                  {lastRoll ?? '—'}
+                </span>
+                <span className="roll-label">
+                  {lastRoll === null
+                    ? 'Waiting for roll'
+                    : lastRoll === 6
+                      ? 'No move — roll again'
+                      : `Roll: ${lastRoll}`}
+                </span>
+              </div>
             </div>
-          )}
-          {lastEvent === 'house_of_netting' && (
-            <div className="event-notice trap">Landed on House of Netting — turn ends!</div>
-          )}
-          {lastEvent === 'waters_of_chaos' && (
-            <div className="event-notice trap">Waters of Chaos — piece washed back!</div>
-          )}
-          {lastEvent === 'bear_off' && (
-            <div className="event-notice good">Piece exited the board!</div>
-          )}
-          {lastEvent === 'capture' && (
-            <div className="event-notice good">Capture! Positions swapped.</div>
-          )}
 
-          {canRoll && (
-            <button className="btn-primary roll-btn" onClick={roll}>
-              Roll Die
-            </button>
-          )}
-
-          {canMove && (
-            <div className="move-hint">
-              Select a highlighted piece, then click a green square
+            <div className="control-primary-item">
+              <button className="btn-primary roll-btn" onClick={roll} disabled={!canRoll}>
+                Roll Die
+              </button>
             </div>
-          )}
+          </div>
 
-          {gameState.phase === 'playing' && (
-            <button className="btn-danger resign-btn" onClick={resign}>
-              Resign
-            </button>
-          )}
+          <div className="control-slot hint-slot">
+            {canMove && (
+              <div className="move-hint">
+                Select a highlighted piece, then click a green square
+              </div>
+            )}
+          </div>
+
+          <div className="control-slot event-slot">
+            {canBearOffSelected ? (
+              <button
+                className="bear-off-inline-btn"
+                onClick={() => handleSelectSquare(BEAR_OFF_POSITION)}
+              >
+                ★ Exit Board ★
+              </button>
+            ) : eventNotice && (
+              <div className={`event-notice ${eventNotice.tone}`}>
+                {eventNotice.text}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Move Log */}
+      {/* Move Log + Chat */}
       {!isFaceoff && (
-        <details className="move-log-container card">
-          <summary>Move Log ({gameState.moveLog.length} entries)</summary>
-          <div className="move-log">
-            {[...gameState.moveLog].reverse().slice(0, 30).map((entry, i) => (
-              <div key={i} className="log-entry">
-                <span className="log-turn">T{entry.turnNumber}</span>
-                <span className={`log-player ${entry.player}`}>
-                  {entry.player === yourPlayer ? 'You' : 'Opp'}
-                </span>
-                <span className="log-roll">🎲{entry.rollValue}</span>
-                <span className="log-action">
-                  {entry.move
-                    ? `${entry.move.from}→${entry.move.to === BEAR_OFF_POSITION ? 'OFF' : entry.move.to}`
-                    : entry.event ?? 'skip'}
-                </span>
-                {entry.event && <span className="log-event">{entry.event}</span>}
-              </div>
-            ))}
+        <div className="move-log-container card">
+          <div className="panel-header">
+            <div className="panel-tabs" role="tablist" aria-label="Game side panel tabs">
+              <button
+                className={`panel-tab${activePanelTab === 'log' ? ' active' : ''}`}
+                onClick={() => setActivePanelTab('log')}
+                role="tab"
+                aria-selected={activePanelTab === 'log'}
+              >
+                Move Log ({gameState.moveLog.length})
+              </button>
+              <button
+                className={`panel-tab${activePanelTab === 'chat' ? ' active' : ''}`}
+                onClick={() => setActivePanelTab('chat')}
+                role="tab"
+                aria-selected={activePanelTab === 'chat'}
+              >
+                Chat
+              </button>
+            </div>
+            {gameState.phase === 'playing' && (
+              <button className="btn-danger resign-btn panel-resign-btn" onClick={resign}>
+                Resign
+              </button>
+            )}
           </div>
-        </details>
+
+          <div className="panel-body">
+            {activePanelTab === 'log' ? (
+              <div className="move-log" role="tabpanel">
+                {[...gameState.moveLog].reverse().slice(0, 30).map((entry, i) => (
+                  <div key={i} className="log-entry">
+                    <span className="log-turn">T{entry.turnNumber}</span>
+                    <span className={`log-player ${entry.player}`}>
+                      {entry.player === yourPlayer ? 'You' : 'Opp'}
+                    </span>
+                    <span className="log-roll">🎲{entry.rollValue}</span>
+                    <span className="log-action">
+                      {entry.move
+                        ? `${entry.move.from}→${entry.move.to === BEAR_OFF_POSITION ? 'OFF' : entry.move.to}`
+                        : entry.event ?? 'skip'}
+                    </span>
+                    {entry.event && <span className="log-event">{entry.event}</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="chat-placeholder" role="tabpanel">
+                <p>Chat panel placeholder.</p>
+                <p>Live messaging will be added here in a later iteration.</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Game Over Overlay */}
@@ -315,20 +400,6 @@ export function GameView() {
             <button className="btn-primary" onClick={handleBack}>
               Back to Lobby
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Special Squares Legend */}
-      {!isFaceoff && (
-        <div className="legend card">
-          <h4>Special Squares</h4>
-          <div className="legend-grid">
-            <span className="legend-item"><span className="sq-sample danger">13</span> House of Netting (trap)</span>
-            <span className="legend-item"><span className="sq-sample bonus">14</span> +1 extra roll</span>
-            <span className="legend-item"><span className="sq-sample bonus">25</span> +1 extra roll</span>
-            <span className="legend-item"><span className="sq-sample danger">26</span> Waters of Chaos</span>
-            <span className="legend-item"><span className="sq-sample safe">27-29</span> Safe squares</span>
           </div>
         </div>
       )}
