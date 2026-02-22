@@ -79,7 +79,7 @@ export function ProfileView() {
         <StatCard label="Avg Turns" value={s.avgTurns} />
         <StatCard label="Captures/Game" value={s.capturesPerGame} />
         <StatCard label="Resign Rate" value={`${s.resignRate}%`} />
-        <StatCard label="Disconnects" value={s.disconnects} />
+        {/* <StatCard label="Disconnects" value={s.disconnects} /> */}
       </div>
 
       <div className="card recent-games">

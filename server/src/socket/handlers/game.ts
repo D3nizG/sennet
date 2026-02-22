@@ -1,5 +1,7 @@
 import { Server } from 'socket.io';
 import type { AuthenticatedSocket } from '../index.js';
+import { QueueManager } from '../../services/queueManager.js';
+import { LobbyManager } from '../../services/lobbyManager.js';
 import { GameManager } from '../../services/gameManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
 import { GameMoveSchema, StartAIGameSchema } from '../events.js';
@@ -8,6 +10,8 @@ import { getLegalMoves, PlayerId } from '@sennet/game-engine';
 export function registerGameHandlers(
   socket: AuthenticatedSocket,
   io: Server,
+  queueManager: QueueManager,
+  lobbyManager: LobbyManager,
   gameManager: GameManager,
   turnRunner: TurnRunner,
   withRateLimit: (fn: (...args: any[]) => void) => (...args: any[]) => void,
@@ -75,6 +79,8 @@ export function registerGameHandlers(
       socket.emit('GAME_ERROR', { code: 'ALREADY_IN_GAME', message: 'Already in a game' });
       return;
     }
+    queueManager.leave(userId);
+    lobbyManager.removeUser(userId);
 
     const aiPlayer = {
       userId: 'ai-player',

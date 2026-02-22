@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import type { AuthenticatedSocket } from '../index.js';
 import { LobbyManager } from '../../services/lobbyManager.js';
+import { QueueManager } from '../../services/queueManager.js';
 import { GameManager } from '../../services/gameManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
 import { LobbyJoinSchema, LobbyInviteSchema } from '../events.js';
@@ -10,6 +11,7 @@ export function registerLobbyHandlers(
   socket: AuthenticatedSocket,
   io: Server,
   lobbyManager: LobbyManager,
+  queueManager: QueueManager,
   gameManager: GameManager,
   userSockets: Map<string, string>,
   turnRunner: TurnRunner,
@@ -22,6 +24,7 @@ export function registerLobbyHandlers(
       socket.emit('GAME_ERROR', { code: 'ALREADY_IN_GAME', message: 'Already in a game' });
       return;
     }
+    queueManager.leave(userId);
 
     const lobby = lobbyManager.create({
       userId,
@@ -58,6 +61,7 @@ export function registerLobbyHandlers(
       socket.emit('GAME_ERROR', { code: 'LOBBY_NOT_FOUND', message: 'Lobby not found or full' });
       return;
     }
+    queueManager.leave(userId);
 
     socket.join(`lobby:${lobby.id}`);
     io.to(`lobby:${lobby.id}`).emit('LOBBY_UPDATE', {
@@ -108,6 +112,8 @@ export function registerLobbyHandlers(
     }
 
     lobbyManager.startGame(lobby.id);
+    queueManager.leave(lobby.host.userId);
+    if (lobby.guest) queueManager.leave(lobby.guest.userId);
 
     try {
       const game = await gameManager.createGame(lobby.host, lobby.guest);

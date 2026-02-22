@@ -125,15 +125,16 @@ export function setupSocketIO(
     }
 
     // Register event handlers
-    registerQueueHandlers(socket, io, queueManager, gameManager, userSockets, turnRunner, withRateLimit);
-    registerLobbyHandlers(socket, io, lobbyManager, gameManager, userSockets, turnRunner, withRateLimit);
-    registerGameHandlers(socket, io, gameManager, turnRunner, withRateLimit);
+    registerQueueHandlers(socket, io, queueManager, lobbyManager, gameManager, userSockets, turnRunner, withRateLimit);
+    registerLobbyHandlers(socket, io, lobbyManager, queueManager, gameManager, userSockets, turnRunner, withRateLimit);
+    registerGameHandlers(socket, io, queueManager, lobbyManager, gameManager, turnRunner, withRateLimit);
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`[socket] Disconnected: user=${userId}`); // TODO: remove
       userSockets.delete(userId);
       queueManager.leaveBySocket(socket.id);
       lobbyManager.removeUser(userId);
+      await turnRunner.handleDisconnectForfeit(userId);
     });
   });
 

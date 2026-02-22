@@ -21,6 +21,7 @@ import { secureRoll } from '../utils/rng.js';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ROLL_TIMEOUT_MS = 5_000;           // 5 s to click Roll
+const MOVE_TIMEOUT_MS = 13_000;          // 13 s to select a move
 const AI_STEP_DELAY_MS = 650;            // delay between AI roll and move
 
 // ─── Return type ─────────────────────────────────────────────────────────────
@@ -36,16 +37,18 @@ function fail(code: string, message: string): Fail { return { ok: false, code, m
 
 export class TurnRunner {
   private rollTimers  = new Map<string, NodeJS.Timeout>();
+  private moveTimers  = new Map<string, NodeJS.Timeout>();
   private aiRunning   = new Set<string>();      // guard against double AI loops
 
   constructor(
     private io: Server,
     private gameManager: GameManager,
     /** Override for testing — allows shorter deadlines and AI delays. */
-    private opts: { rollTimeoutMs?: number; aiDelayMs?: number } = {},
+    private opts: { rollTimeoutMs?: number; moveTimeoutMs?: number; aiDelayMs?: number } = {},
   ) {}
 
   private get rollTimeout(): number { return this.opts.rollTimeoutMs ?? ROLL_TIMEOUT_MS; }
+  private get moveTimeout(): number { return this.opts.moveTimeoutMs ?? MOVE_TIMEOUT_MS; }
   private get aiDelay(): number     { return this.opts.aiDelayMs ?? AI_STEP_DELAY_MS; }
 
   // ━━ Public API (called by socket handlers) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -150,6 +153,8 @@ export class TurnRunner {
     if (!move) return fail('ILLEGAL_MOVE', 'That move is not legal');
 
     try {
+      this.clearMoveTimer(gameId);
+      game.timeoutStreak[playerId] = 0; // manual move breaks timeout streak
       const { state, event } = this.gameManager.doMove(game, move);
       console.log(`[TurnRunner] MOVE game=${gameId} ${move.pieceId} ${move.from}→${move.to} event=${event ?? '-'}`);
 
@@ -212,6 +217,7 @@ export class TurnRunner {
   /** Cleanup all timers / AI loops for a game. */
   cleanupGame(gameId: string): void {
     this.clearRollTimer(gameId);
+    this.clearMoveTimer(gameId);
     this.aiRunning.delete(gameId);
   }
 
@@ -255,6 +261,82 @@ export class TurnRunner {
       // Normal gameplay: auto-roll for current player
       this.autoRoll(gameId);
     }
+  }
+
+  // ━━ Move Timer (13 seconds) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  private startMoveTimer(gameId: string): void {
+    this.clearMoveTimer(gameId);
+    const game = this.gameManager.get(gameId);
+    if (!game || game.isAiGame) return;
+    if (game.state.phase !== 'playing' || game.state.turnPhase !== 'move') return;
+
+    const deadline = Date.now() + this.moveTimeout;
+    game.moveDeadline = deadline;
+
+    console.log(`[TurnRunner] Move timer started: game=${gameId} deadline=${deadline} (${this.moveTimeout}ms)`);
+
+    const timer = setTimeout(() => {
+      this.handleMoveTimeout(gameId);
+    }, this.moveTimeout);
+
+    this.moveTimers.set(gameId, timer);
+  }
+
+  private clearMoveTimer(gameId: string): void {
+    const timer = this.moveTimers.get(gameId);
+    if (timer) {
+      clearTimeout(timer);
+      this.moveTimers.delete(gameId);
+    }
+    const game = this.gameManager.get(gameId);
+    if (game) game.moveDeadline = null;
+  }
+
+  private handleMoveTimeout(gameId: string): void {
+    const game = this.gameManager.get(gameId);
+    if (!game || game.state.phase !== 'playing' || game.state.turnPhase !== 'move') return;
+    if (game.state.currentRoll === null) return;
+
+    this.clearMoveTimer(gameId);
+
+    const timedOutPlayer = game.state.currentPlayer;
+    const legalMoves = getLegalMoves(game.state, timedOutPlayer, game.state.currentRoll);
+    if (legalMoves.length === 0) {
+      console.warn(`[TurnRunner] Move timeout with no legal moves: game=${gameId} player=${timedOutPlayer}`);
+      this.afterAction(gameId);
+      return;
+    }
+
+    const randomMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+    const { state, event } = this.gameManager.doMove(game, randomMove);
+    game.timeoutStreak[timedOutPlayer] = (game.timeoutStreak[timedOutPlayer] ?? 0) + 1;
+
+    console.log(
+      `[TurnRunner] AUTO-MOVE game=${gameId} player=${timedOutPlayer} streak=${game.timeoutStreak[timedOutPlayer]} move=${randomMove.pieceId} ${randomMove.from}→${randomMove.to}`,
+    );
+
+    this.io.to(gameId).emit('GAME_MOVE_APPLIED', {
+      move: randomMove,
+      gameState: state,
+      event,
+      autoPlayed: true,
+    });
+
+    // Three consecutive move timeouts by the same player = automatic forfeit.
+    if (game.timeoutStreak[timedOutPlayer] >= 3) {
+      const winner: PlayerId = timedOutPlayer === 'player1' ? 'player2' : 'player1';
+      game.state = { ...game.state, phase: 'finished', winner };
+      this.finishGame(game, winner, 'timeout');
+      return;
+    }
+
+    if (state.phase === 'finished' && state.winner) {
+      this.finishGame(game, state.winner, 'all_pieces_off');
+      return;
+    }
+
+    this.afterAction(gameId);
   }
 
   /** Auto-roll on behalf of a player who didn't click Roll in time. */
@@ -475,10 +557,34 @@ export class TurnRunner {
     if (!game || game.state.phase !== 'playing') return;
 
     if (game.isAiGame && game.state.currentPlayer === game.aiPlayer) {
+      this.clearMoveTimer(gameId);
+      this.clearRollTimer(gameId);
       this.runAITurn(gameId);
     } else if (!game.isAiGame && game.state.turnPhase === 'roll') {
+      this.clearMoveTimer(gameId);
       this.startRollTimer(gameId);
+      // Broadcast the newly set rollDeadlineAt so clients can render countdown.
+      const updated = this.gameManager.get(gameId);
+      if (updated) this.emitStateToAll(updated);
+    } else if (!game.isAiGame && game.state.turnPhase === 'move') {
+      this.clearRollTimer(gameId);
+      this.startMoveTimer(gameId);
+      const updated = this.gameManager.get(gameId);
+      if (updated) this.emitStateToAll(updated);
     }
+  }
+
+  /** Immediate forfeit for disconnected player in multiplayer games. */
+  async handleDisconnectForfeit(userId: string): Promise<void> {
+    const game = this.gameManager.getByUser(userId);
+    if (!game || game.isAiGame || game.state.phase === 'finished') return;
+
+    const playerId = this.gameManager.getPlayerIdForUser(game, userId);
+    if (!playerId) return;
+
+    const winner: PlayerId = playerId === 'player1' ? 'player2' : 'player1';
+    game.state = { ...game.state, phase: 'finished', winner };
+    await this.finishGame(game, winner, 'disconnect');
   }
 
   /** End game, persist, emit GAME_OVER, clean up timers. */
@@ -508,6 +614,7 @@ export class TurnRunner {
         opponentName: opponent.displayName,
         opponentColor: opponent.houseColor,
         isAiGame: game.isAiGame,
+        moveDeadline: game.moveDeadline,
         rollDeadlineAt: game.rollDeadlineAt,
         faceoffRolls: game.state.phase === 'initial_roll' ? game.faceoffRolls : null,
         faceoffRound: game.faceoffRound,
@@ -525,6 +632,7 @@ export class TurnRunner {
       opponentName: opponent.displayName,
       opponentColor: opponent.houseColor,
       isAiGame: game.isAiGame,
+      moveDeadline: game.moveDeadline,
       rollDeadlineAt: game.rollDeadlineAt,
       faceoffRolls: game.state.phase === 'initial_roll' ? game.faceoffRolls : null,
       faceoffRound: game.faceoffRound,

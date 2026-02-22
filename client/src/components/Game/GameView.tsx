@@ -16,7 +16,7 @@ export function GameView() {
     gameState, yourPlayer, opponentName, opponentColor,
     legalMoves, lastRoll, lastEvent, gameOver,
     initialRolls, inGame, isAiGame,
-    rollDeadlineAt, faceoffRolls, faceoffRound,
+    moveDeadline, rollDeadlineAt, faceoffRolls, faceoffRound,
     roll, move, resign, resetGame, requestRejoin,
   } = game;
 
@@ -24,18 +24,21 @@ export function GameView() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!rollDeadlineAt) {
+    const deadline = gameState?.phase === 'playing' && gameState.turnPhase === 'move'
+      ? moveDeadline
+      : rollDeadlineAt;
+    if (!deadline) {
       setTimeLeft(null);
       return;
     }
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((rollDeadlineAt - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       setTimeLeft(remaining);
     };
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
-  }, [rollDeadlineAt]);
+  }, [gameState?.phase, gameState?.turnPhase, moveDeadline, rollDeadlineAt]);
 
   // On mount, request rejoin from server in case we refreshed
   useEffect(() => {
@@ -99,6 +102,9 @@ export function GameView() {
   const oppPlayer = yourPlayer === 'player1' ? 'player2' : 'player1';
   const oppFaceoffRoll = faceoffRolls?.[oppPlayer] ?? null;
   const canFaceoffRoll = isFaceoff && yourFaceoffRoll === null;
+  const isMovePhase = gameState.phase === 'playing' && gameState.turnPhase === 'move';
+  const activeDeadline = isMovePhase ? moveDeadline : rollDeadlineAt;
+  const deadlineWindowSeconds = isMovePhase ? 13 : 5;
 
   // Borne-off counts
   const yourBorneOff = gameState.pieces.filter(
@@ -138,12 +144,19 @@ export function GameView() {
       </div>
 
       {/* Roll Timer Bar (multiplayer only, shown for both faceoff and normal rolls) */}
-      {timeLeft !== null && !gameOver && !isAiGame && (
+      {timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && (
         <div className={`timer-bar${timeLeft <= 2 ? ' urgent' : ''}`}>
-          <div className="timer-bar-fill" style={{ width: `${Math.min(100, (timeLeft / 5) * 100)}%` }} />
+          <div
+            className="timer-bar-fill"
+            style={{ width: `${Math.min(100, (timeLeft / deadlineWindowSeconds) * 100)}%` }}
+          />
           <span className="timer-bar-text">
             {isFaceoff
               ? `Roll now! — ${timeLeft}s`
+              : isMovePhase
+                ? isYourTurn
+                  ? `Move now! — ${timeLeft}s`
+                  : `Opponent moving — ${timeLeft}s`
               : isYourTurn
                 ? `Roll now! — ${timeLeft}s`
                 : `Opponent rolling — ${timeLeft}s`}

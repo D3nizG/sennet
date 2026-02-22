@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import type { AuthenticatedSocket } from '../index.js';
 import { QueueManager } from '../../services/queueManager.js';
 import { GameManager } from '../../services/gameManager.js';
+import { LobbyManager } from '../../services/lobbyManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
 import { PlayerId } from '@sennet/game-engine';
 
@@ -9,6 +10,7 @@ export function registerQueueHandlers(
   socket: AuthenticatedSocket,
   io: Server,
   queueManager: QueueManager,
+  lobbyManager: LobbyManager,
   gameManager: GameManager,
   userSockets: Map<string, string>,
   turnRunner: TurnRunner,
@@ -20,6 +22,10 @@ export function registerQueueHandlers(
     // Can't queue if already in a game
     if (gameManager.getByUser(userId)) {
       socket.emit('GAME_ERROR', { code: 'ALREADY_IN_GAME', message: 'You are already in a game' });
+      return;
+    }
+    if (lobbyManager.getByUser(userId)) {
+      socket.emit('GAME_ERROR', { code: 'IN_LOBBY', message: 'Leave your lobby before joining queue' });
       return;
     }
 
@@ -35,6 +41,18 @@ export function registerQueueHandlers(
     const match = queueManager.tryMatch();
     if (match) {
       const [a, b] = match;
+      const aConnected = io.sockets.sockets.has(a.socketId);
+      const bConnected = io.sockets.sockets.has(b.socketId);
+      const aInGame = !!gameManager.getByUser(a.userId);
+      const bInGame = !!gameManager.getByUser(b.userId);
+
+      // Skip stale entries and re-queue only valid/available players.
+      if (!aConnected || !bConnected || aInGame || bInGame) {
+        if (aConnected && !aInGame) queueManager.join({ ...a, joinedAt: Date.now() });
+        if (bConnected && !bInGame) queueManager.join({ ...b, joinedAt: Date.now() });
+        return;
+      }
+
       // Randomly assign player1/player2
       const [p1, p2] = Math.random() < 0.5 ? [a, b] : [b, a];
 

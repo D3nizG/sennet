@@ -18,7 +18,7 @@ That file is the **single source of truth** for all game rules. The game engine 
 | Row-Break | Adjacency for protection/blockade only within same row (9↔10 NOT adjacent) |
 | Square 13 | House of Netting — trap, turn ends immediately |
 | Square 14 | +1 extra roll |
-| Square 25 | +1 extra roll (not safe) |
+| Square 25 | +1 extra roll |
 | Square 26 | Waters of Chaos — piece washed to 13 (or 0, or next free), turn ends |
 | Squares 27–29 | Safe — cannot be captured |
 | Forced Backward | If no forward move exists, must move backward |

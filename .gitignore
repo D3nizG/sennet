@@ -65,3 +65,5 @@ client/dist/
 *.pid
 *.seed
 *.pid.lock
+
+ToDO.txt
