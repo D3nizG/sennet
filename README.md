@@ -74,6 +74,7 @@ Required variables are documented in [`./.env.example`](./.env.example). For loc
 - `DIRECT_URL` can usually match `DATABASE_URL` locally
 - `JWT_SECRET` must be set
 - `CLIENT_URL` should remain `http://localhost:5173` unless you change the Vite dev origin
+- `VITE_API_URL` and `VITE_SOCKET_URL` can be left blank locally to use the Vite proxy fallback
 
 ### Prisma
 
@@ -107,6 +108,58 @@ Default local ports:
 - client: `http://localhost:5173`
 
 The Vite client proxies `/api` and `/socket.io` to the server in development.
+
+## Production Hosting
+
+Recommended split:
+
+- frontend on Vercel
+- backend on Render
+- PostgreSQL on Supabase
+
+### Frontend on Vercel
+
+Because the client imports the shared workspace package from `packages/game-engine`, Vercel should build from the repo root, not from `client/`.
+
+Set these values in Vercel:
+
+- Framework Preset: `Vite`
+- Root Directory: repo root
+- Install Command: `npm install`
+- Build Command: `npm run build -w @sennet/game-engine && npm run build -w client`
+- Output Directory: `client/dist`
+
+Required frontend env vars:
+
+- `VITE_API_URL=https://api.your-domain.com/api`
+- `VITE_SOCKET_URL=https://api.your-domain.com`
+
+### Backend on Render
+
+Render should also build from the repo root so the server can access the shared workspace package.
+
+Use the included [`render.yaml`](./render.yaml) blueprint or match these settings manually:
+
+- Build Command: `npm install && npm run build -w @sennet/game-engine && npm run db:generate -w server && npm run build -w server`
+- Start Command: `npm run start -w server`
+- Pre-Deploy Command: `npm run db:migrate:deploy -w server`
+- Health Check Path: `/health`
+
+Required backend env vars:
+
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `JWT_SECRET`
+- `CLIENT_URL=https://your-frontend-domain.com`
+
+### Domains
+
+Recommended domain split:
+
+- `sennet.d3nizg.dev` → Vercel frontend
+- `api.sennet.d3nizg.dev` → Render backend
+
+The client is now environment-driven for cross-origin deploys, while still falling back to same-origin `/api` and `window.location.origin` for local dev.
 
 ## Test And Build
 

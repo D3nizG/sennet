@@ -3,6 +3,10 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@sennet/game-en
 
 export type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : '');
+
 let socket: TypedSocket | null = null;
 /** Track the token the current socket was created/connected with */
 let currentToken: string | null = null;
@@ -19,7 +23,7 @@ export function getSocket(): TypedSocket {
 
   if (!socket) {
     currentToken = token;
-    socket = io('/', {
+    socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
       autoConnect: false,
