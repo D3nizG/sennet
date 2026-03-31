@@ -18,7 +18,7 @@ build/
 *.db-journal
 *.sqlite
 *.sqlite3
-server/prisma/migrations/
+# migrations are intentionally tracked — needed for `prisma migrate deploy` in production
 
 # ─── Prisma ───────────────────────────────────────────────────────────────────
 # Generated client is reproducible via `prisma generate`

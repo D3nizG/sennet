@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { apiLimiter } from '../middleware/rateLimit.js';
+import { logger } from '../utils/logger.js';
 
 const UpdateProfileSchema = z.object({
   displayName: z.string().min(1).max(30).optional(),
@@ -85,7 +86,7 @@ export function profileRouter(prisma: PrismaClient): Router {
         recentGames: recent,
       });
     } catch (err) {
-      console.error('Profile error:', err);
+      logger.error({ err }, 'Profile error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -109,7 +110,7 @@ export function profileRouter(prisma: PrismaClient): Router {
         res.status(400).json({ error: 'Validation failed', details: err.errors });
         return;
       }
-      console.error('Profile update error:', err);
+      logger.error({ err }, 'Profile update error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });

@@ -1,6 +1,6 @@
-# Sennet — Multiplayer Senet Web App
+# Sennet - Multiplayer Senet Web App
 
-A production-ready web implementation of the ancient Egyptian board game **Senet**, featuring online multiplayer matchmaking, friend-based private matches, single-player AI, and full player profiles with statistics.
+A production-ready web implementation of the ancient Egyptian board game **Senet**, featuring online multiplayer matchmaking, friend-based private matches, single-player AI, and player profiles with statistics.
 
 ## Quick Start
 
@@ -43,7 +43,7 @@ npm run dev:client   # Vite React on :5173
 ### Testing
 
 ```bash
-# Run all tests
+# Run all workspace tests
 npm test
 
 # Game engine tests only
@@ -52,6 +52,9 @@ npm run test:engine
 # Server tests only
 npm run test:server
 ```
+
+Coverage details and module-level test documentation:
+- [`TESTING.md`](./TESTING.md)
 
 ### Production Build
 
@@ -86,6 +89,7 @@ Sennet/
 │       ├── context/       # Auth + Socket providers
 │       └── hooks/         # useGame hook
 ├── ARCHITECTURE.md
+├── TESTING.md
 ├── SECURITY.md
 └── RULES.md
 ```
@@ -118,4 +122,5 @@ Sennet/
 
 - Game rules: [`sennet-core-logic.md`](./sennet-core-logic.md)
 - Architecture: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- Testing: [`TESTING.md`](./TESTING.md)
 - Security: [`SECURITY.md`](./SECURITY.md)

@@ -17,3 +17,6 @@ export const GameResignSchema = z.object({}).strict();
 export const StartAIGameSchema = z.object({
   difficulty: z.enum(['easy', 'medium', 'hard']),
 });
+export const GameChatSchema = z.object({
+  message: z.string().min(1).max(500).trim(),
+});

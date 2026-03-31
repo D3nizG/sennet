@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
@@ -9,6 +9,7 @@ import './LobbyView.css';
 
 export function LobbyView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { socket, connected } = useSocket();
   const { inGame } = useGame();
   const { user } = useAuth();
@@ -32,6 +33,16 @@ export function LobbyView() {
       navigate('/game');
     }
   }, [inGame, navigate]);
+
+  // Auto-queue when navigated from "Play Again"
+  useEffect(() => {
+    const state = location.state as { autoQueue?: boolean } | null;
+    if (state?.autoQueue && connected && socket) {
+      socket.emit('QUEUE_JOIN');
+      setQueuing(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, connected, socket, navigate, location.pathname]);
 
   // Load friends
   useEffect(() => {
@@ -128,6 +139,22 @@ export function LobbyView() {
       setError(err.message);
     }
   }, []);
+
+  const handleRemoveFriend = useCallback(async (friendshipId: string) => {
+    try {
+      await api.removeFriend(friendshipId);
+      setFriends(prev => prev.filter(f => f.friendshipId !== friendshipId));
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }, []);
+
+  const handleInviteFriendToGame = useCallback((friendId: string) => {
+    if (!lobby) {
+      socket?.emit('LOBBY_CREATE');
+    }
+    socket?.emit('LOBBY_INVITE', { friendId });
+  }, [socket, lobby]);
 
   return (
     <div className="lobby-view">
@@ -259,7 +286,21 @@ export function LobbyView() {
           {friends.length > 0 ? (
             <ul className="friend-list">
               {friends.map((f: any) => (
-                <li key={f.id}>{f.displayName} <span className="friend-tag">@{f.username}</span></li>
+                <li key={f.friendshipId ?? f.id} className="friend-item">
+                  <span className="friend-name">{f.displayName} <span className="friend-tag">@{f.username}</span></span>
+                  <div className="friend-actions">
+                    <button
+                      className="btn-icon"
+                      title="Invite to game"
+                      onClick={() => handleInviteFriendToGame(f.id)}
+                    >+</button>
+                    <button
+                      className="btn-icon btn-icon-danger"
+                      title="Remove friend"
+                      onClick={() => handleRemoveFriend(f.friendshipId ?? f.id)}
+                    >🗑</button>
+                  </div>
+                </li>
               ))}
             </ul>
           ) : (

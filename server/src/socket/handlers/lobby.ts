@@ -6,6 +6,7 @@ import { GameManager } from '../../services/gameManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
 import { LobbyJoinSchema, LobbyInviteSchema } from '../events.js';
 import { PlayerId } from '@sennet/game-engine';
+import { logger } from '../../utils/logger.js';
 
 export function registerLobbyHandlers(
   socket: AuthenticatedSocket,
@@ -117,7 +118,7 @@ export function registerLobbyHandlers(
 
     try {
       const game = await gameManager.createGame(lobby.host, lobby.guest);
-      console.log(`[LOBBY_START] Game created: ${game.gameId} host=${lobby.host.userId} guest=${lobby.guest.userId}`); // TODO: remove
+      logger.debug({ gameId: game.gameId, hostId: lobby.host.userId, guestId: lobby.guest.userId }, '[LOBBY_START] Game created');
 
       // Move sockets from lobby room to game room
       const s1 = io.sockets.sockets.get(lobby.host.socketId);
@@ -150,7 +151,7 @@ export function registerLobbyHandlers(
       lobbyManager.removeLobby(lobby.id);
       turnRunner.startFaceoff(game.gameId);
     } catch (err) {
-      console.error('Lobby start error:', err);
+      logger.error({ err }, 'Lobby start error');
       socket.emit('GAME_ERROR', { code: 'GAME_CREATE_ERROR', message: 'Failed to start game' });
     }
   }));

@@ -80,6 +80,13 @@ export interface LobbyInvitePayload {
   fromUsername: string;
 }
 
+export interface ChatMessagePayload {
+  senderId: string;
+  senderName: string;
+  message: string;
+  timestamp: number;
+}
+
 // ─── Client → Server Events ─────────────────────────────────────────────────
 
 export interface ClientToServerEvents {
@@ -95,6 +102,7 @@ export interface ClientToServerEvents {
   GAME_REJOIN: () => void;
   GAME_LEAVE: () => void;
   START_AI_GAME: (data: { difficulty: AIDifficulty }) => void;
+  GAME_CHAT: (data: { message: string }) => void;
 }
 
 // ─── Server → Client Events ─────────────────────────────────────────────────
@@ -110,4 +118,5 @@ export interface ServerToClientEvents {
   GAME_OVER: (data: GameOverPayload) => void;
   FRIEND_REQUEST: (data: FriendRequestPayload) => void;
   LOBBY_INVITE_RECEIVED: (data: LobbyInvitePayload) => void;
+  GAME_CHAT: (data: ChatMessagePayload) => void;
 }

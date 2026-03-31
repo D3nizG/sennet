@@ -4,7 +4,7 @@ import type {
   GameState, PlayerId, Move,
   GameStatePayload, GameRollResultPayload,
   GameMoveAppliedPayload, GameOverPayload,
-  InitialRollPayload, QueueMatchedPayload,
+  InitialRollPayload, QueueMatchedPayload, ChatMessagePayload,
 } from '@sennet/game-engine';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ interface GameInfo {
   rollDeadlineAt: number | null;   // epoch ms — server auto-roll deadline (5s)
   faceoffRolls: { player1: number | null; player2: number | null } | null;
   faceoffRound: number;
+  chatMessages: ChatMessagePayload[];
 }
 
 interface GameContextValue extends GameInfo {
@@ -35,6 +36,7 @@ interface GameContextValue extends GameInfo {
   resign: () => void;
   resetGame: () => void;
   requestRejoin: () => void;
+  sendChatMessage: (message: string) => void;
 }
 
 const INITIAL_STATE: GameInfo = {
@@ -55,6 +57,7 @@ const INITIAL_STATE: GameInfo = {
   rollDeadlineAt: null,
   faceoffRolls: null,
   faceoffRound: 0,
+  chatMessages: [],
 };
 
 const GameContext = createContext<GameContextValue>({
@@ -64,6 +67,7 @@ const GameContext = createContext<GameContextValue>({
   resign: () => {},
   resetGame: () => {},
   requestRejoin: () => {},
+  sendChatMessage: () => {},
 });
 
 // ─── Provider ────────────────────────────────────────────────────────────────
@@ -97,7 +101,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         gameState: data.gameState,
         yourPlayer: data.yourPlayer,
         opponentName: data.opponentName,
-        opponentColor: data.opponentColor,
+        opponentColor: data.opponentColor || prev.opponentColor || '',
         isAiGame: data.isAiGame,
         inGame: true,
         // Preserve legalMoves when in move phase — they were set by GAME_ROLL_RESULT
@@ -156,12 +160,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }));
     };
 
+    const onChatMessage = (data: ChatMessagePayload) => {
+      setGame(prev => ({
+        ...prev,
+        chatMessages: [...prev.chatMessages, data],
+      }));
+    };
+
     socket.on('QUEUE_MATCHED', onQueueMatched);
     socket.on('GAME_STATE', onGameState);
     socket.on('GAME_ROLL_RESULT', onRollResult);
     socket.on('GAME_MOVE_APPLIED', onMoveApplied);
     socket.on('GAME_OVER', onGameOver);
     socket.on('GAME_INITIAL_ROLL', onInitialRoll);
+    socket.on('GAME_CHAT', onChatMessage);
 
     return () => {
       socket.off('QUEUE_MATCHED', onQueueMatched);
@@ -170,6 +182,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off('GAME_MOVE_APPLIED', onMoveApplied);
       socket.off('GAME_OVER', onGameOver);
       socket.off('GAME_INITIAL_ROLL', onInitialRoll);
+      socket.off('GAME_CHAT', onChatMessage);
     };
   }, [socket]);
 
@@ -201,8 +214,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket?.emit('GAME_REJOIN');
   }, [socket]);
 
+  const sendChatMessage = useCallback((message: string) => {
+    if (!message.trim()) return;
+    socket?.emit('GAME_CHAT', { message: message.trim() });
+  }, [socket]);
+
   return (
-    <GameContext.Provider value={{ ...game, roll, move, resign, resetGame, requestRejoin }}>
+    <GameContext.Provider value={{ ...game, roll, move, resign, resetGame, requestRejoin, sendChatMessage }}>
       {children}
     </GameContext.Provider>
   );

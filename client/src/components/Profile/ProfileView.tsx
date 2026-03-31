@@ -49,7 +49,29 @@ export function ProfileView() {
               <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Display Name" />
               <div className="color-picker">
                 <label>House Color:</label>
-                <input type="color" value={houseColor} onChange={e => setHouseColor(e.target.value)} />
+                <div className="color-swatches">
+                  {[
+                    { name: 'Red',    hex: '#e53e3e' },
+                    { name: 'Orange', hex: '#dd6b20' },
+                    { name: 'Yellow', hex: '#d69e2e' },
+                    { name: 'Green',  hex: '#38a169' },
+                    { name: 'Blue',   hex: '#3182ce' },
+                    { name: 'Purple', hex: '#805ad5' },
+                    { name: 'Cyan',   hex: '#00b5d8' },
+                    { name: 'Black',  hex: '#1a1a1a' },
+                    { name: 'White',  hex: '#f0ece3' },
+                    { name: 'Silver', hex: '#a0aec0' },
+                  ].map(({ name, hex }) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      title={name}
+                      className={`color-swatch${houseColor === hex ? ' selected' : ''}`}
+                      style={{ background: hex }}
+                      onClick={() => setHouseColor(hex)}
+                    />
+                  ))}
+                </div>
               </div>
               <div className="edit-actions">
                 <button className="btn-primary" onClick={handleSave} disabled={saving}>
