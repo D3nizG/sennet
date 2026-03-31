@@ -1,9 +1,9 @@
 # Sennet — Roadmap to Live Production
 
-> **Status as of March 2026:** The game is feature-complete and locally playable.
-> Two browser-tab multiplayer works end-to-end. All core rules, mechanics, AI,
-> matchmaking, lobbies, friends, and stats are implemented. This roadmap turns
-> that solid foundation into a publicly hosted, scalable, production game.
+> **Status as of March 2026:** Phase 0 complete. Phase 1 (database migration + logging)
+> in progress. The game is feature-complete, the database is live on Supabase PostgreSQL,
+> and all Phase 0 polish items (chat, rematch, friend delete/invite, preset colors,
+> reload fix, disconnect grace timer) have been implemented.
 
 ---
 
@@ -34,41 +34,41 @@
 
 ---
 
-## Phase 0 — Polish the Existing Game
+## Phase 0 — Polish the Existing Game ✅ COMPLETE
 
 > **Goal:** Ship a complete, bug-free experience before going live.
 > No new infrastructure — just finish what's started.
 
-### 0.1 Complete In-Game Chat
+### 0.1 Complete In-Game Chat ✅
 
-- Add `CHAT_MESSAGE` socket event (client → server → room broadcast)
-- Validate message payload with Zod (max 200 chars, strip HTML)
-- Render in the existing Chat tab with sender name + timestamp
-- Rate limit: max 5 messages / 10 seconds per socket
+- `GAME_CHAT` event added to game-engine events (client→server→room broadcast)
+- Zod schema (`GameChatSchema`) validates payload: min 1, max 500 chars
+- Server handler broadcasts with sender name + timestamp
+- Chat tab in GameView now shows messages and input form with auto-scroll
 
-**Files to touch:** `server/src/socket/events.ts`, `server/src/socket/handlers/game.ts`, `client/src/components/Game/GameView.tsx`, `client/src/components/Game/GameView.css`
+### 0.2 Post-Game Options ✅
 
-### 0.2 Post-Game Options (Rematch / New Game)
+- **Play Again** button on game-over overlay: resets game state, navigates to `/` with `autoQueue: true`
+- LobbyView handles `autoQueue` navigation state and immediately joins the queue
+- AI games show only "Back to Lobby" (no play again for solo)
 
-- Add **Rematch** and **New Game** buttons to the game-over overlay
-- Rematch: emit `LOBBY_REMATCH` → server creates new lobby between same two players → starts automatically when both accept
-- New Game: same as current "Back to Lobby"
+### 0.3 Bug Fixes ✅
 
-### 0.3 Bug Fixes
+- **Reload → instant resign**: 15s disconnect grace timer in TurnRunner, canceled on reconnect
+- **Reload → empty screen on /game**: GameView shows "Connecting..." while socket is not yet connected
+- **Opponent color not rendering**: `opponentColor` preserved across GAME_STATE updates
+- **Friend delete missing**: `DELETE /friends/:id` endpoint + trash button in friends list UI
+- **Infinite color picker**: replaced `<input type="color">` with 10 preset swatches
 
-- Fix `bestStreak` race: replace double-query pattern with a raw `MAX` update or a serialized stats-update queue
-- Remove all `// TODO: remove` console statements — replace with structured logging (see Phase 1.2)
-- Confirm `currentStreak` resets to 0 on loss (currently sets to literal `0` instead of `{ set: 0 }` in Prisma update)
+### 0.4 UX — Friend Invite from Friends List ✅
 
-### 0.4 Client Test Suite
+- Invite (+) button beside each friend: creates lobby (if not in one) then emits `LOBBY_INVITE`
 
-- Add Vitest + React Testing Library to `client`
-- Cover: `AuthContext`, `SocketContext`, `useGame` hook, `Board` rendering, `GameView` state transitions
-- Target: 60 %+ line coverage before launch
+### Remaining from Phase 0 (deferred to later)
 
-### 0.5 UX Micro-Improvements (from todo.md)
-
-- All items in `todo.md` are already scoped — implement as a single focused PR
+- Client test suite (Vitest + React Testing Library)
+- `bestStreak` race condition fix
+- Remove all `// TODO: remove` console statements (planned for Phase 1 logging work)
 
 ---
 

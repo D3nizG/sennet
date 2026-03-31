@@ -5,6 +5,7 @@ import {
   getLegalMoves, BEAR_OFF_POSITION,
 } from '@sennet/game-engine';
 import { secureRoll } from '../utils/rng.js';
+import { logger } from '../utils/logger.js';
 
 export interface ActiveGame {
   gameId: string;
@@ -182,7 +183,7 @@ export class GameManager {
         },
       });
     } catch (err) {
-      console.error('[endGame] Failed to persist game:', err); // TODO: remove
+      logger.error({ err }, '[endGame] Failed to persist game');
     }
 
     // Update stats for both players
@@ -245,7 +246,7 @@ export class GameManager {
           }
         }
       } catch (err) {
-        console.error(`[endGame] Failed to update stats for ${player.userId}:`, err); // TODO: remove
+        logger.error({ err, userId: player.userId }, '[endGame] Failed to update stats');
       }
     }
 

@@ -17,6 +17,7 @@ import {
   type PlayerId, type Move, type AIDifficulty,
 } from '@sennet/game-engine';
 import { secureRoll } from '../utils/rng.js';
+import { logger } from '../utils/logger.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -35,10 +36,13 @@ function fail(code: string, message: string): Fail { return { ok: false, code, m
 
 // ─── TurnRunner ──────────────────────────────────────────────────────────────
 
+const DISCONNECT_GRACE_MS = 15_000;          // 15 s to reconnect before forfeit
+
 export class TurnRunner {
-  private rollTimers  = new Map<string, NodeJS.Timeout>();
-  private moveTimers  = new Map<string, NodeJS.Timeout>();
-  private aiRunning   = new Set<string>();      // guard against double AI loops
+  private rollTimers        = new Map<string, NodeJS.Timeout>();
+  private moveTimers        = new Map<string, NodeJS.Timeout>();
+  private disconnectTimers  = new Map<string, NodeJS.Timeout>(); // userId → forfeit timer
+  private aiRunning         = new Set<string>();      // guard against double AI loops
 
   constructor(
     private io: Server,
@@ -87,7 +91,7 @@ export class TurnRunner {
 
     // Generate server-authoritative roll
     game.faceoffRolls[playerId] = secureRoll();
-    console.log(`[TurnRunner] FACEOFF-ROLL game=${gameId} ${playerId}=${game.faceoffRolls[playerId]} round=${game.faceoffRound}`);
+    logger.debug({ gameId, playerId, roll: game.faceoffRolls[playerId], round: game.faceoffRound }, '[TurnRunner] FACEOFF-ROLL');
 
     // Emit updated state so both clients see who has rolled
     this.emitStateToAll(game);
@@ -116,7 +120,7 @@ export class TurnRunner {
     this.clearRollTimer(gameId);
 
     const { rollValue, legalMoves, event } = this.gameManager.doRoll(game);
-    console.log(`[TurnRunner] ROLL game=${gameId} player=${playerId} val=${rollValue} moves=${legalMoves.length} event=${event ?? '-'}`);
+    logger.debug({ gameId, playerId, rollValue, moves: legalMoves.length, event }, '[TurnRunner] ROLL');
 
     // Emit roll result to all players in the room
     this.io.to(gameId).emit('GAME_ROLL_RESULT', {
@@ -156,7 +160,7 @@ export class TurnRunner {
       this.clearMoveTimer(gameId);
       game.timeoutStreak[playerId] = 0; // manual move breaks timeout streak
       const { state, event } = this.gameManager.doMove(game, move);
-      console.log(`[TurnRunner] MOVE game=${gameId} ${move.pieceId} ${move.from}→${move.to} event=${event ?? '-'}`);
+      logger.debug({ gameId, pieceId: move.pieceId, from: move.from, to: move.to, event }, '[TurnRunner] MOVE');
 
       this.io.to(gameId).emit('GAME_MOVE_APPLIED', { move, gameState: state, event });
 
@@ -192,7 +196,7 @@ export class TurnRunner {
         finalState: state,
       });
     } catch (e) {
-      console.error('[TurnRunner] resign error:', e);
+      logger.error({ err: e }, '[TurnRunner] resign error');
       return fail('RESIGN_ERROR', 'Failed to resign');
     }
 
@@ -207,7 +211,7 @@ export class TurnRunner {
     const game = this.gameManager.get(gameId);
     if (!game || game.state.phase !== 'playing') return;
 
-    console.log(`[TurnRunner] Game ready: ${gameId} first=${game.state.currentPlayer} ai=${game.isAiGame}`);
+    logger.info({ gameId, firstPlayer: game.state.currentPlayer, isAiGame: game.isAiGame }, '[TurnRunner] Game ready');
     this.emitStateToAll(game);
 
     // Start the first turn — afterAction handles roll timer or AI
@@ -219,6 +223,13 @@ export class TurnRunner {
     this.clearRollTimer(gameId);
     this.clearMoveTimer(gameId);
     this.aiRunning.delete(gameId);
+    // Clear any pending disconnect timers for players in this game
+    const game = this.gameManager.get(gameId);
+    if (game) {
+      for (const pid of ['player1', 'player2'] as PlayerId[]) {
+        this.cancelDisconnectTimer(game.players[pid].userId);
+      }
+    }
   }
 
   // ━━ Roll Timer (5 seconds) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -231,7 +242,7 @@ export class TurnRunner {
     const deadline = Date.now() + this.rollTimeout;
     game.rollDeadlineAt = deadline;
 
-    console.log(`[TurnRunner] Roll timer started: game=${gameId} deadline=${deadline} (${this.rollTimeout}ms)`);
+    logger.debug({ gameId, deadline, timeoutMs: this.rollTimeout }, '[TurnRunner] Roll timer started');
 
     const timer = setTimeout(() => {
       this.handleRollTimeout(gameId);
@@ -274,7 +285,7 @@ export class TurnRunner {
     const deadline = Date.now() + this.moveTimeout;
     game.moveDeadline = deadline;
 
-    console.log(`[TurnRunner] Move timer started: game=${gameId} deadline=${deadline} (${this.moveTimeout}ms)`);
+    logger.debug({ gameId, deadline, timeoutMs: this.moveTimeout }, '[TurnRunner] Move timer started');
 
     const timer = setTimeout(() => {
       this.handleMoveTimeout(gameId);
@@ -303,7 +314,7 @@ export class TurnRunner {
     const timedOutPlayer = game.state.currentPlayer;
     const legalMoves = getLegalMoves(game.state, timedOutPlayer, game.state.currentRoll);
     if (legalMoves.length === 0) {
-      console.warn(`[TurnRunner] Move timeout with no legal moves: game=${gameId} player=${timedOutPlayer}`);
+      logger.warn({ gameId, player: timedOutPlayer }, '[TurnRunner] Move timeout with no legal moves');
       this.afterAction(gameId);
       return;
     }
@@ -312,9 +323,7 @@ export class TurnRunner {
     const { state, event } = this.gameManager.doMove(game, randomMove);
     game.timeoutStreak[timedOutPlayer] = (game.timeoutStreak[timedOutPlayer] ?? 0) + 1;
 
-    console.log(
-      `[TurnRunner] AUTO-MOVE game=${gameId} player=${timedOutPlayer} streak=${game.timeoutStreak[timedOutPlayer]} move=${randomMove.pieceId} ${randomMove.from}→${randomMove.to}`,
-    );
+    logger.debug({ gameId, player: timedOutPlayer, streak: game.timeoutStreak[timedOutPlayer], pieceId: randomMove.pieceId, from: randomMove.from, to: randomMove.to }, '[TurnRunner] AUTO-MOVE');
 
     this.io.to(gameId).emit('GAME_MOVE_APPLIED', {
       move: randomMove,
@@ -349,7 +358,7 @@ export class TurnRunner {
     const playerId = game.state.currentPlayer;
     const { rollValue, legalMoves, event } = this.gameManager.doRoll(game);
 
-    console.log(`[TurnRunner] AUTO-ROLL game=${gameId} player=${playerId} val=${rollValue} moves=${legalMoves.length}`);
+    logger.debug({ gameId, playerId, rollValue, moves: legalMoves.length }, '[TurnRunner] AUTO-ROLL');
 
     this.io.to(gameId).emit('GAME_ROLL_RESULT', {
       playerId,
@@ -371,7 +380,7 @@ export class TurnRunner {
     game.faceoffRolls = { player1: null, player2: null };
     game.faceoffRound++;
 
-    console.log(`[TurnRunner] Faceoff round ${game.faceoffRound} starting: game=${gameId}`);
+    logger.debug({ gameId, round: game.faceoffRound }, '[TurnRunner] Faceoff round starting');
 
     // Start shared 5s timer for both players
     this.startRollTimer(gameId);
@@ -384,16 +393,16 @@ export class TurnRunner {
     const game = this.gameManager.get(gameId);
     if (!game || game.state.phase !== 'initial_roll') return;
 
-    console.log(`[TurnRunner] Faceoff timeout: game=${gameId} round=${game.faceoffRound} p1=${game.faceoffRolls.player1} p2=${game.faceoffRolls.player2}`);
+    logger.debug({ gameId, round: game.faceoffRound, p1Roll: game.faceoffRolls.player1, p2Roll: game.faceoffRolls.player2 }, '[TurnRunner] Faceoff timeout');
 
     // Auto-roll for any player who hasn't rolled
     if (game.faceoffRolls.player1 === null) {
       game.faceoffRolls.player1 = secureRoll();
-      console.log(`[TurnRunner] Auto-rolled faceoff for player1: ${game.faceoffRolls.player1}`);
+      logger.debug({ roll: game.faceoffRolls.player1 }, '[TurnRunner] Auto-rolled faceoff for player1');
     }
     if (game.faceoffRolls.player2 === null) {
       game.faceoffRolls.player2 = secureRoll();
-      console.log(`[TurnRunner] Auto-rolled faceoff for player2: ${game.faceoffRolls.player2}`);
+      logger.debug({ roll: game.faceoffRolls.player2 }, '[TurnRunner] Auto-rolled faceoff for player2');
     }
 
     this.evaluateFaceoff(gameId);
@@ -421,7 +430,7 @@ export class TurnRunner {
     });
 
     if (game.state.initialRolls.decided) {
-      console.log(`[TurnRunner] Faceoff decided: game=${gameId} winner=${game.state.initialRolls.firstPlayer}`);
+      logger.info({ gameId, firstPlayer: game.state.initialRolls.firstPlayer }, '[TurnRunner] Faceoff decided');
 
       // Emit playing state and start roll timer for the winner's first roll
       this.emitStateToAll(game);
@@ -429,7 +438,7 @@ export class TurnRunner {
       // Winner must now roll to start. afterAction handles roll timer.
       this.afterAction(gameId);
     } else {
-      console.log(`[TurnRunner] Faceoff undecided (p1=${p1} p2=${p2}): game=${gameId} → next round`);
+      logger.debug({ gameId, p1, p2 }, '[TurnRunner] Faceoff undecided, starting next round');
 
       // Not decided — start another round after a brief visual delay
       this.emitStateToAll(game);
@@ -486,7 +495,7 @@ export class TurnRunner {
 
         // ─ Step 1: Roll ──────────────────────────────────────────────────
         const { rollValue, legalMoves, event } = this.gameManager.doRoll(game);
-        console.log(`[TurnRunner] AI-ROLL game=${gameId} val=${rollValue} moves=${legalMoves.length} event=${event ?? '-'}`);
+        logger.debug({ gameId, rollValue, moves: legalMoves.length, event }, '[TurnRunner] AI-ROLL');
 
         this.io.to(gameId).emit('GAME_ROLL_RESULT', {
           playerId: game.aiPlayer!,
@@ -510,7 +519,7 @@ export class TurnRunner {
 
           if (aiMove) {
             const { state, event: moveEvent } = this.gameManager.doMove(game2, aiMove);
-            console.log(`[TurnRunner] AI-MOVE game=${gameId} ${aiMove.pieceId} ${aiMove.from}→${aiMove.to}`);
+            logger.debug({ gameId, pieceId: aiMove.pieceId, from: aiMove.from, to: aiMove.to }, '[TurnRunner] AI-MOVE');
 
             this.io.to(gameId).emit('GAME_MOVE_APPLIED', {
               move: aiMove,
@@ -574,17 +583,41 @@ export class TurnRunner {
     }
   }
 
-  /** Immediate forfeit for disconnected player in multiplayer games. */
-  async handleDisconnectForfeit(userId: string): Promise<void> {
+  /**
+   * Start a grace-period timer for a disconnected player.
+   * If they reconnect within DISCONNECT_GRACE_MS, cancelDisconnectTimer() cancels this.
+   * If they don't, the game is forfeited to the opponent.
+   */
+  handleDisconnectForfeit(userId: string): void {
     const game = this.gameManager.getByUser(userId);
     if (!game || game.isAiGame || game.state.phase === 'finished') return;
 
-    const playerId = this.gameManager.getPlayerIdForUser(game, userId);
-    if (!playerId) return;
+    // Cancel any existing timer for this user (e.g. rapid disconnect/reconnect)
+    this.cancelDisconnectTimer(userId);
 
-    const winner: PlayerId = playerId === 'player1' ? 'player2' : 'player1';
-    game.state = { ...game.state, phase: 'finished', winner };
-    await this.finishGame(game, winner, 'disconnect');
+    const timer = setTimeout(async () => {
+      this.disconnectTimers.delete(userId);
+      const activeGame = this.gameManager.getByUser(userId);
+      if (!activeGame || activeGame.isAiGame || activeGame.state.phase === 'finished') return;
+
+      const playerId = this.gameManager.getPlayerIdForUser(activeGame, userId);
+      if (!playerId) return;
+
+      const winner: PlayerId = playerId === 'player1' ? 'player2' : 'player1';
+      activeGame.state = { ...activeGame.state, phase: 'finished', winner };
+      await this.finishGame(activeGame, winner, 'disconnect');
+    }, DISCONNECT_GRACE_MS);
+
+    this.disconnectTimers.set(userId, timer);
+  }
+
+  /** Cancel a pending disconnect forfeit — called when the player reconnects. */
+  cancelDisconnectTimer(userId: string): void {
+    const timer = this.disconnectTimers.get(userId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(userId);
+    }
   }
 
   /** End game, persist, emit GAME_OVER, clean up timers. */
@@ -598,7 +631,7 @@ export class TurnRunner {
         finalState: game.state,
       });
     } catch (e) {
-      console.error('[TurnRunner] finishGame error:', e);
+      logger.error({ err: e }, '[TurnRunner] finishGame error');
     }
   }
 

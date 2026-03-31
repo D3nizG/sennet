@@ -4,8 +4,9 @@ import { QueueManager } from '../../services/queueManager.js';
 import { LobbyManager } from '../../services/lobbyManager.js';
 import { GameManager } from '../../services/gameManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
-import { GameMoveSchema, StartAIGameSchema } from '../events.js';
+import { GameMoveSchema, StartAIGameSchema, GameChatSchema } from '../events.js';
 import { getLegalMoves, PlayerId } from '@sennet/game-engine';
+import { logger } from '../../utils/logger.js';
 
 export function registerGameHandlers(
   socket: AuthenticatedSocket,
@@ -22,7 +23,7 @@ export function registerGameHandlers(
   socket.on('GAME_REJOIN', withRateLimit(() => {
     const game = gameManager.getByUser(userId);
     if (!game) {
-      console.log(`[GAME_REJOIN] No active game for user ${userId}`);
+      logger.debug({ userId }, '[GAME_REJOIN] No active game for user');
       return;
     }
 
@@ -33,7 +34,7 @@ export function registerGameHandlers(
     gameManager.reconnectPlayer(game, userId, socket.id);
     socket.join(game.gameId);
 
-    console.log(`[GAME_REJOIN] Re-sending state to user=${userId} game=${game.gameId} phase=${game.state.phase} turnPhase=${game.state.turnPhase}`);
+    logger.debug({ userId, gameId: game.gameId, phase: game.state.phase, turnPhase: game.state.turnPhase }, '[GAME_REJOIN] Re-sending state');
 
     // If the game is in move phase and it's this player's turn, resend
     // GAME_ROLL_RESULT first so the client has the legal moves.
@@ -61,7 +62,7 @@ export function registerGameHandlers(
     if (!game) return;
 
     if (game.state.phase === 'finished') {
-      console.log(`[GAME_LEAVE] User ${userId} left finished game ${game.gameId}`);
+      logger.debug({ userId, gameId: game.gameId }, '[GAME_LEAVE] User left finished game');
       socket.leave(game.gameId);
       gameManager.clearUserMapping(userId);
     }
@@ -111,7 +112,7 @@ export function registerGameHandlers(
 
       turnRunner.startFaceoff(game.gameId);
     } catch (err) {
-      console.error('AI game error:', err);
+      logger.error({ err }, 'AI game error');
       socket.emit('GAME_ERROR', { code: 'GAME_CREATE_ERROR', message: 'Failed to create AI game' });
     }
   }));
@@ -165,5 +166,27 @@ export function registerGameHandlers(
     if (!result.ok) {
       socket.emit('GAME_ERROR', { code: result.code, message: result.message });
     }
+  }));
+
+  // ── Chat ────────────────────────────────────────────────────────────────
+  socket.on('GAME_CHAT', withRateLimit((data: unknown) => {
+    const parsed = GameChatSchema.safeParse(data);
+    if (!parsed.success) {
+      socket.emit('GAME_ERROR', { code: 'INVALID_PAYLOAD', message: 'Invalid chat message' });
+      return;
+    }
+
+    const game = gameManager.getByUser(userId);
+    if (!game) {
+      socket.emit('GAME_ERROR', { code: 'NO_GAME', message: 'Not in a game' });
+      return;
+    }
+
+    io.to(game.gameId).emit('GAME_CHAT', {
+      senderId: userId,
+      senderName: socket.data.displayName,
+      message: parsed.data.message,
+      timestamp: Date.now(),
+    });
   }));
 }

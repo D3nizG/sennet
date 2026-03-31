@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { Board } from '../Board/Board';
 import { BEAR_OFF_POSITION } from '@sennet/game-engine';
 import './GameView.css';
@@ -9,11 +10,14 @@ import './GameView.css';
 export function GameView() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { connected } = useSocket();
   const game = useGame();
   const [selectedPiece, setSelectedPiece] = useState<string | null>(null);
   const [activePanelTab, setActivePanelTab] = useState<'log' | 'chat' | 'help'>('log');
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [rollingPreview, setRollingPreview] = useState<number | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
   const rollAnimIntervalRef = useRef<number | null>(null);
   const rollAnimTimeoutRef = useRef<number | null>(null);
 
@@ -22,6 +26,7 @@ export function GameView() {
     legalMoves, lastRoll, lastEvent, gameOver,
     initialRolls, inGame, isAiGame,
     moveDeadline, rollDeadlineAt, faceoffRolls, faceoffRound,
+    chatMessages, sendChatMessage,
     roll, move, resign, resetGame, requestRejoin,
   } = game;
 
@@ -57,6 +62,11 @@ export function GameView() {
     if (legalMoves.length === 0) setSelectedPiece(null);
   }, [legalMoves]);
 
+  // Auto-scroll chat to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
   const handleSelectPiece = useCallback((pieceId: string) => {
     setSelectedPiece(prev => prev === pieceId ? null : pieceId);
   }, []);
@@ -78,6 +88,17 @@ export function GameView() {
       <div className="game-view">
         <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
           <p>Loading game...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Socket not yet connected — show connecting state instead of "No active game"
+  if (!connected && !inGame && !gameState) {
+    return (
+      <div className="game-view">
+        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+          <p>Connecting...</p>
         </div>
       </div>
     );
@@ -454,9 +475,35 @@ export function GameView() {
                 ))}
               </div>
             ) : activePanelTab === 'chat' ? (
-              <div className="chat-placeholder" role="tabpanel">
-                <p>Chat panel placeholder.</p>
-                <p>Live messaging will be added here in a later iteration.</p>
+              <div className="chat-panel" role="tabpanel">
+                <div className="chat-messages">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`chat-message ${msg.senderId === user?.id ? 'mine' : 'theirs'}`}>
+                      <span className="chat-sender">{msg.senderId === user?.id ? 'You' : msg.senderName}</span>
+                      <span className="chat-text">{msg.message}</span>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+                <form
+                  className="chat-input-row"
+                  onSubmit={e => {
+                    e.preventDefault();
+                    sendChatMessage(chatInput);
+                    setChatInput('');
+                  }}
+                >
+                  <input
+                    className="chat-input"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    placeholder="Message..."
+                    maxLength={500}
+                  />
+                  <button type="submit" className="btn-primary chat-send" disabled={!chatInput.trim()}>
+                    Send
+                  </button>
+                </form>
               </div>
             ) : (
               <div className="help-panel" role="tabpanel">
@@ -489,9 +536,16 @@ export function GameView() {
                   ? 'Opponent auto-resigned due to inactivity.'
                   : 'Auto-resigned due to inactivity.')}
             </p>
-            <button className="btn-primary" onClick={handleBack}>
-              Back to Lobby
-            </button>
+            <div className="game-over-actions">
+              {!isAiGame && (
+                <button className="btn-primary" onClick={() => { resetGame(); navigate('/', { state: { autoQueue: true } }); }}>
+                  Play Again
+                </button>
+              )}
+              <button className="btn-secondary" onClick={handleBack}>
+                Back to Lobby
+              </button>
+            </div>
           </div>
         </div>
       )}

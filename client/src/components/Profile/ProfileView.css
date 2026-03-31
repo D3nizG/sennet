@@ -49,11 +49,31 @@
   font-size: 0.85rem;
 }
 
-.color-picker input[type="color"] {
-  width: 40px;
-  height: 30px;
-  border: none;
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
   cursor: pointer;
+  padding: 0;
+  outline: none;
+  transition: transform 0.1s, border-color 0.1s;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.color-swatch.selected {
+  border-color: var(--gold);
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.4);
 }
 
 .edit-actions {

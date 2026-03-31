@@ -54,4 +54,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ friendshipId, accept }),
     }),
+
+  removeFriend: (friendshipId: string) =>
+    request<any>(`/friends/${friendshipId}`, { method: 'DELETE' }),
 };

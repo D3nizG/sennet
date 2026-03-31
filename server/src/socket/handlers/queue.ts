@@ -5,6 +5,7 @@ import { GameManager } from '../../services/gameManager.js';
 import { LobbyManager } from '../../services/lobbyManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
 import { PlayerId } from '@sennet/game-engine';
+import { logger } from '../../utils/logger.js';
 
 export function registerQueueHandlers(
   socket: AuthenticatedSocket,
@@ -58,7 +59,7 @@ export function registerQueueHandlers(
 
       try {
         const game = await gameManager.createGame(p1, p2);
-        console.log(`[QUEUE] Game created: ${game.gameId} p1=${p1.userId} p2=${p2.userId}`);
+        logger.info({ gameId: game.gameId, p1UserId: p1.userId, p2UserId: p2.userId }, '[QUEUE] Game created');
 
         // Join both sockets to the game room
         const s1 = io.sockets.sockets.get(p1.socketId);
@@ -81,7 +82,7 @@ export function registerQueueHandlers(
         // Start user-driven faceoff via TurnRunner
         turnRunner.startFaceoff(game.gameId);
       } catch (err) {
-        console.error('Match creation error:', err);
+        logger.error({ err }, 'Match creation error');
         socket.emit('GAME_ERROR', { code: 'MATCH_ERROR', message: 'Failed to create match' });
       }
     }

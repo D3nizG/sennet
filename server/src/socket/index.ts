@@ -11,6 +11,7 @@ import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
 import { TurnRunner } from '../services/turnRunner.js';
 import { getLegalMoves, type ClientToServerEvents, type ServerToClientEvents } from '@sennet/game-engine';
+import { logger } from '../utils/logger.js';
 
 export interface AuthenticatedSocket extends Socket<ClientToServerEvents, ServerToClientEvents> {
   data: {
@@ -81,7 +82,7 @@ export function setupSocketIO(
     const socket = rawSocket as AuthenticatedSocket;
     const userId = socket.data.user.userId;
     userSockets.set(userId, socket.id);
-    console.log(`[socket] Connected: user=${userId} socket=${socket.id}`); // TODO: remove
+    logger.debug({ userId, socketId: socket.id }, '[socket] Connected');
 
     // Rate-limit wrapper
     const withRateLimit = (handler: (...args: any[]) => void) => {
@@ -99,7 +100,8 @@ export function setupSocketIO(
     if (activeGame) {
       const playerId = gameManager.getPlayerIdForUser(activeGame, userId);
       if (playerId) {
-        console.log(`[socket] Reconnect: user=${userId} → game=${activeGame.gameId} as ${playerId} turnPhase=${activeGame.state.turnPhase}`);
+        logger.info({ userId, gameId: activeGame.gameId, playerId, turnPhase: activeGame.state.turnPhase }, '[socket] Reconnect');
+        turnRunner.cancelDisconnectTimer(userId);
         gameManager.reconnectPlayer(activeGame, userId, socket.id);
         socket.join(activeGame.gameId);
 
@@ -129,12 +131,12 @@ export function setupSocketIO(
     registerLobbyHandlers(socket, io, lobbyManager, queueManager, gameManager, userSockets, turnRunner, withRateLimit);
     registerGameHandlers(socket, io, queueManager, lobbyManager, gameManager, turnRunner, withRateLimit);
 
-    socket.on('disconnect', async () => {
-      console.log(`[socket] Disconnected: user=${userId}`); // TODO: remove
+    socket.on('disconnect', () => {
+      logger.debug({ userId }, '[socket] Disconnected');
       userSockets.delete(userId);
       queueManager.leaveBySocket(socket.id);
       lobbyManager.removeUser(userId);
-      await turnRunner.handleDisconnectForfeit(userId);
+      turnRunner.handleDisconnectForfeit(userId);
     });
   });
 

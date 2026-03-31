@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { createToken } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { config } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 const RegisterSchema = z.object({
   username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/),
@@ -49,7 +50,7 @@ export function authRouter(prisma: PrismaClient): Router {
         res.status(400).json({ error: 'Validation failed', details: err.errors });
         return;
       }
-      console.error('Register error:', err);
+      logger.error({ err }, 'Register error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -79,7 +80,7 @@ export function authRouter(prisma: PrismaClient): Router {
         res.status(400).json({ error: 'Validation failed', details: err.errors });
         return;
       }
-      console.error('Login error:', err);
+      logger.error({ err }, 'Login error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });

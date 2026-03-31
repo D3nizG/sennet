@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { apiLimiter } from '../middleware/rateLimit.js';
+import { logger } from '../utils/logger.js';
 
 const AddFriendSchema = z.object({
   username: z.string().min(3).max(20),
@@ -40,7 +41,7 @@ export function friendsRouter(prisma: PrismaClient): Router {
 
       res.json({ friends });
     } catch (err) {
-      console.error('Friends list error:', err);
+      logger.error({ err }, 'Friends list error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -62,7 +63,7 @@ export function friendsRouter(prisma: PrismaClient): Router {
         })),
       });
     } catch (err) {
-      console.error('Pending friends error:', err);
+      logger.error({ err }, 'Pending friends error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -100,7 +101,7 @@ export function friendsRouter(prisma: PrismaClient): Router {
         res.status(400).json({ error: 'Validation failed', details: err.errors });
         return;
       }
-      console.error('Add friend error:', err);
+      logger.error({ err }, 'Add friend error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -127,7 +128,32 @@ export function friendsRouter(prisma: PrismaClient): Router {
         res.status(400).json({ error: 'Validation failed', details: err.errors });
         return;
       }
-      console.error('Friend respond error:', err);
+      logger.error({ err }, 'Friend respond error');
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Delete / unfriend
+  router.delete('/:friendshipId', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const friendshipId = req.params.friendshipId as string;
+
+      const friendship = await prisma.friendship.findFirst({
+        where: {
+          id: friendshipId,
+          OR: [
+            { requesterId: userId },
+            { addresseeId: userId },
+          ],
+        },
+      });
+      if (!friendship) { res.status(404).json({ error: 'Friendship not found' }); return; }
+
+      await prisma.friendship.delete({ where: { id: friendshipId } });
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error({ err }, 'Remove friend error');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
