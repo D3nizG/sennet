@@ -1,17 +1,17 @@
 # @sennet/game-engine
 
-Shared, pure Senet rules engine used by both server and client.
+Shared TypeScript package for Senet rules, AI move selection, and the typed Socket.IO payload contract used by both client and server.
 
 ## Responsibilities
 
-- Authoritative game state transitions
-- Legal move generation (forward and forced-backward)
-- Special-square effects (13/14/25/26/27-29)
-- Piece protection and blockade logic
-- AI move selection (easy/medium/hard)
-- Shared Socket.IO event type contracts
+- canonical game state and constants
+- faceoff resolution and initial piece placement
+- legal move generation, including forced backward moves
+- capture, protection, blockade, special-square, and bear-off rules
+- heuristic AI move selection
+- shared event payload types for the realtime protocol
 
-## Public API
+## Main API
 
 - `initGame(gameId)`
 - `performInitialRoll(state, p1Roll, p2Roll)`
@@ -21,19 +21,19 @@ Shared, pure Senet rules engine used by both server and client.
 - `checkWinner(state)`
 - `getAIMove(state, playerId, rollValue, difficulty)`
 
+## Source Layout
+
+- `src/types.ts`: state model, constants, and helpers
+- `src/board.ts`: board geometry, adjacency, protection, blockade, and path checks
+- `src/moves.ts`: legal move generation
+- `src/engine.ts`: roll and move state transitions
+- `src/rolls.ts`: deterministic RNG helpers for tests and simulations
+- `src/ai.ts`: AI scoring and move selection
+- `src/events.ts`: shared realtime payload types
+
 ## Development
 
 ```bash
 npm run build -w @sennet/game-engine
 npm run test -w @sennet/game-engine
 ```
-
-## Source Layout
-
-- `src/types.ts`: canonical type model and constants
-- `src/board.ts`: board geometry and path/protection checks
-- `src/moves.ts`: legal move generation
-- `src/engine.ts`: state machine transitions
-- `src/rolls.ts`: seeded deterministic RNG utilities
-- `src/ai.ts`: scoring-based AI selector
-- `src/events.ts`: typed client/server event payloads

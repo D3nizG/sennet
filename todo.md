@@ -1,20 +1,50 @@
-Visual Changes:
-- [x] does not render the opponent's chosen color — fixed: preserve opponentColor across GAME_STATE updates
-- [x] allows users to choose any rgb — replaced with 10 preset color swatches (R/O/Y/G/B/Purple/Cyan/Black/White/Silver)
-- [x] reloading /game shows empty background — fixed: show "Connecting..." while socket connects
-- (FUTURE) animations for house of netting, bonus, waters of chaos, and being borne off.
+# TODO
 
-Performance Changes:
-- [x] reloading the game gives an instant resign — fixed: 15s disconnect grace timer in TurnRunner
+## Cleanup
 
-Logic Changes:
-- [x] allow users to chat to each other in game — GAME_CHAT socket event, server handler + client UI
-- [x] add "rematch" || "new game" option on game finish screen — "Play Again" button auto-queues
-- friends:
-    - [x] cannot delete friends once added — DELETE /friends/:id endpoint + trash button in UI
-    - [x] users should have the option to invite a friend to a game — invite (+) button in friends list creates lobby + invites
+- [ ] remove temporary client debug logging from `client/src/context/GameContext.tsx`
+- [ ] remove temporary client debug logging from `client/src/components/Lobby/LobbyView.tsx`
+- [ ] remove temporary client debug logging from `client/src/services/socket.ts`
+- [ ] remove the stray `ToDO.txt` line in `.gitignore`
+- [ ] either add `server/prisma/seed.ts` or remove the stale `db:seed` script from `server/package.json`
+- [ ] keep repo docs aligned with implementation changes so setup, infra, and feature status do not drift again
+- [ ] review environment examples whenever runtime config changes so `.env.example` stays production-relevant
+- [ ] keep rules/reference docs synchronized with the shared engine so malformed or non-repo content does not get committed again
 
-Remaining (Phase 1+):
-- structured logging (replace console.log with pino)
-- CI/CD: GitHub Actions workflow
-- Deploy: Railway (server) + Vercel (client) + sennet.d3n1zg.dev
+## Correctness
+
+- [ ] fix the `bestStreak` update path in `server/src/services/gameManager.ts` so it does not rely on a second read/write cycle
+- [ ] review the test database story after the Postgres migration so docs, CI, and local setup stay consistent
+- [ ] decide whether active games need persistence or recovery beyond the current in-memory `GameManager`
+
+## Testing
+
+- [ ] add client tests for auth, socket, and game providers
+- [ ] add client tests for lobby flow, reconnect flow, and timer rendering
+- [ ] add client tests for chat and game-over rematch behavior
+
+## Deployment And Ops
+
+- [ ] choose and document the production hosting target
+- [ ] add deployment config for server and client
+- [ ] document pooled vs direct Postgres URLs for production
+- [ ] add error monitoring and uptime checks
+
+## Later Product Work
+
+- [ ] leaderboard
+- [ ] replay/history endpoint and viewer
+- [ ] spectator mode
+- [ ] mobile/PWA polish
+- [ ] board and special-square animation polish
+
+## Completed Recently
+
+- [x] in-game chat
+- [x] friend removal
+- [x] friend invites into lobbies
+- [x] multiplayer post-game auto-queue flow
+- [x] reconnect grace timer
+- [x] preset profile color swatches
+- [x] server logging through `pino`
+- [x] CI workflow
