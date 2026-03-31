@@ -18,8 +18,8 @@ The game engine (`packages/game-engine`) contains all Senet rules as pure functi
 
 | Function | Purpose |
 |----------|---------|
-| `initGame(id)` | Creates a new game with traditional alternating piece layout on squares 0–9 |
-| `performInitialRoll(state, p1Roll, p2Roll)` | Simultaneous roll to determine first player |
+| `initGame(id)` | Creates a new game in `initial_roll` phase with an empty board |
+| `performInitialRoll(state, p1Roll, p2Roll)` | Simultaneous roll to determine first player and place pieces |
 | `applyRoll(state, rollValue)` | Applies a roll: enters move phase, or skips turn if blocked |
 | `applyMove(state, move)` | Applies a validated move, handles captures, specials, bearing off |
 | `getLegalMoves(state, playerId, rollValue)` | Returns all legal forward moves; if none, returns backward moves |
@@ -125,3 +125,9 @@ The board is a CSS Grid of 3 rows × 10 columns. Row 2 is displayed in reverse o
 12. Server emits GAME_MOVE_APPLIED { move, gameState }
 13. Client updates board display
 ```
+
+## Test Architecture
+
+- `packages/game-engine/src/__tests__` covers pure rule computation modules (`engine`, `moves`, `board`, `rolls`, `types`, `ai`).
+- `server/src/__tests__` covers orchestration and server concerns (`turnRunner`, `gameManager`, `aiPlayer`, queue/lobby managers, auth middleware, socket payload schemas, and app registration).
+- Full command matrix and coverage instructions live in [`TESTING.md`](./TESTING.md).
