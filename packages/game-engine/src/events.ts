@@ -117,6 +117,7 @@ export interface ServerToClientEvents {
   GAME_ERROR: (data: GameErrorPayload) => void;
   GAME_OVER: (data: GameOverPayload) => void;
   FRIEND_REQUEST: (data: FriendRequestPayload) => void;
+  FRIENDS_UPDATED: () => void;
   LOBBY_INVITE_RECEIVED: (data: LobbyInvitePayload) => void;
   GAME_CHAT: (data: ChatMessagePayload) => void;
 }

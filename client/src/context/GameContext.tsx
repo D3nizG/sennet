@@ -208,11 +208,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, [socket]);
 
   const requestRejoin = useCallback(() => {
-    if (rejoinRequested.current) return;
+    if (!socket?.connected || rejoinRequested.current) return;
     rejoinRequested.current = true;
     console.log('[GameProvider] Emitting GAME_REJOIN'); // TODO: remove
-    socket?.emit('GAME_REJOIN');
+    socket.emit('GAME_REJOIN');
   }, [socket]);
+
+  useEffect(() => {
+    if (!socket?.connected) {
+      rejoinRequested.current = false;
+    }
+  }, [socket?.connected]);
 
   const sendChatMessage = useCallback((message: string) => {
     if (!message.trim()) return;

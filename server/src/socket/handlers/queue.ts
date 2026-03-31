@@ -13,7 +13,6 @@ export function registerQueueHandlers(
   queueManager: QueueManager,
   lobbyManager: LobbyManager,
   gameManager: GameManager,
-  userSockets: Map<string, string>,
   turnRunner: TurnRunner,
   withRateLimit: (fn: (...args: any[]) => void) => (...args: any[]) => void,
 ): void {

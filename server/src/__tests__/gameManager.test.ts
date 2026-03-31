@@ -99,8 +99,13 @@ describe('GameManager', () => {
     const { p1, p2 } = makePlayers();
     const game = await gm.createGame(p1, p2);
 
-    expect(gm.reconnectPlayer(game, 'u1', 'new-socket')).toBe('player1');
+    expect(gm.reconnectPlayer(game, 'u1', 'new-socket', {
+      displayName: 'Updated One',
+      houseColor: '#333333',
+    })).toBe('player1');
     expect(game.players.player1.socketId).toBe('new-socket');
+    expect(game.players.player1.displayName).toBe('Updated One');
+    expect(game.players.player1.houseColor).toBe('#333333');
     expect(gm.reconnectPlayer(game, 'missing', 'x')).toBeNull();
 
     await gm.saveState(game);

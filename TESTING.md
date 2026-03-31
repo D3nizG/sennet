@@ -7,7 +7,7 @@ The repo currently has automated tests for:
 - `packages/game-engine`: pure gameplay rules and helpers
 - `server`: route wiring, services, orchestration, validation, and integration behavior
 
-The client currently has no automated test suite.
+The client currently has no automated component/provider suite, and the repo has no end-to-end browser coverage yet.
 
 ## Commands
 
@@ -41,7 +41,7 @@ The GitHub Actions workflow at `.github/workflows/ci.yml` currently does the fol
 4. runs `npm test`
 5. builds server and client
 
-The current workflow does not run any client-specific test suite because none exists yet.
+The current workflow does not run any client-specific test suite or browser E2E flow because neither exists yet.
 
 ## Coverage Reporting
 
@@ -94,5 +94,7 @@ The biggest testing gap is still the client:
 - no provider tests
 - no lobby/game flow tests
 - no reconnect/timer UI coverage
+- no browser-level direct-route refresh coverage for `/game`
+- no E2E coverage for auth, rematch, or post-game flows
 
 That gap is intentionally tracked in [`todo.md`](./todo.md) and [`ROADMAP.md`](./ROADMAP.md).

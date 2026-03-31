@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { apiLimiter } from '../middleware/rateLimit.js';
+import { emitToUser } from '../socket/presence.js';
 import { logger } from '../utils/logger.js';
 
 const AddFriendSchema = z.object({
@@ -95,6 +96,9 @@ export function friendsRouter(prisma: PrismaClient): Router {
         data: { requesterId: userId, addresseeId: target.id },
       });
 
+      emitToUser(target.id, 'FRIENDS_UPDATED');
+      emitToUser(userId, 'FRIENDS_UPDATED');
+
       res.status(201).json({ friendshipId: friendship.id, status: 'pending' });
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -121,6 +125,9 @@ export function friendsRouter(prisma: PrismaClient): Router {
         where: { id: friendship.id },
         data: { status: data.accept ? 'accepted' : 'rejected' },
       });
+
+      emitToUser(userId, 'FRIENDS_UPDATED');
+      emitToUser(friendship.requesterId, 'FRIENDS_UPDATED');
 
       res.json({ status: data.accept ? 'accepted' : 'rejected' });
     } catch (err) {
@@ -151,6 +158,8 @@ export function friendsRouter(prisma: PrismaClient): Router {
       if (!friendship) { res.status(404).json({ error: 'Friendship not found' }); return; }
 
       await prisma.friendship.delete({ where: { id: friendshipId } });
+      emitToUser(friendship.requesterId, 'FRIENDS_UPDATED');
+      emitToUser(friendship.addresseeId, 'FRIENDS_UPDATED');
       res.json({ ok: true });
     } catch (err) {
       logger.error({ err }, 'Remove friend error');

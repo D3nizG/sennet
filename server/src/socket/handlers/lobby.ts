@@ -5,6 +5,7 @@ import { QueueManager } from '../../services/queueManager.js';
 import { GameManager } from '../../services/gameManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
 import { LobbyJoinSchema, LobbyInviteSchema } from '../events.js';
+import { getUserSocketId } from '../presence.js';
 import { PlayerId } from '@sennet/game-engine';
 import { logger } from '../../utils/logger.js';
 
@@ -14,7 +15,6 @@ export function registerLobbyHandlers(
   lobbyManager: LobbyManager,
   queueManager: QueueManager,
   gameManager: GameManager,
-  userSockets: Map<string, string>,
   turnRunner: TurnRunner,
   withRateLimit: (fn: (...args: any[]) => void) => (...args: any[]) => void,
 ): void {
@@ -89,7 +89,7 @@ export function registerLobbyHandlers(
       return;
     }
 
-    const friendSocketId = userSockets.get(parsed.data.friendId);
+    const friendSocketId = getUserSocketId(parsed.data.friendId);
     if (friendSocketId) {
       const friendSocket = io.sockets.sockets.get(friendSocketId);
       friendSocket?.emit('LOBBY_INVITE_RECEIVED', {

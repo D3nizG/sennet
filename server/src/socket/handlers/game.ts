@@ -31,8 +31,12 @@ export function registerGameHandlers(
     if (!playerId) return;
 
     // Update socket mapping and re-join room
-    gameManager.reconnectPlayer(game, userId, socket.id);
+    gameManager.reconnectPlayer(game, userId, socket.id, {
+      displayName: socket.data.displayName,
+      houseColor: socket.data.houseColor,
+    });
     socket.join(game.gameId);
+    turnRunner.emitStateToAll(game);
 
     logger.debug({ userId, gameId: game.gameId, phase: game.state.phase, turnPhase: game.state.turnPhase }, '[GAME_REJOIN] Re-sending state');
 
