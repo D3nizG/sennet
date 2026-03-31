@@ -8,13 +8,14 @@ As of March 31, 2026, the playable product in this repo includes:
 
 - authenticated accounts with profile customization
 - quick match queue and private lobby flow
-- friend requests, friend removal, and lobby invites
+- friend requests, live friend-list refresh, friend removal, and lobby invites
 - AI games with `easy`, `medium`, and `hard` difficulty
 - server-driven faceoff, roll timers, move timers, timeout auto-play, and reconnect handling
+- live opponent color sync after profile changes and reconnect
 - persisted game history and user stats through Prisma on PostgreSQL
 - CI for install, type-check, build, and engine/server test runs
 
-The main gaps are around documentation drift, client test coverage, deployment/runbook work, and a few cleanup items called out in [`todo.md`](./todo.md) and [`ROADMAP.md`](./ROADMAP.md).
+The main gaps are around production auth hardening, client and end-to-end coverage, audiovisual polish, onboarding/help UX, rematch UX, and a few cleanup items called out in [`todo.md`](./todo.md) and [`ROADMAP.md`](./ROADMAP.md).
 
 ## Workspace Layout
 
@@ -192,6 +193,15 @@ Build outputs:
 - single-player AI with heuristic move selection
 - chat during games
 - profile stats and recent games
+
+## Near-Term Product Focus
+
+- email-backed auth and a stronger production auth story, potentially via Supabase Auth/OAuth
+- end-to-end coverage for login, lobby/game flow, refresh/reconnect, and rematch UX
+- sound design for traps, bonuses, swaps, bear-off, win/loss, turn changes, and low-time pressure
+- board and piece motion polish, including move/swap animation work
+- a dedicated how-to-play surface for onboarding
+- gameplay HUD cleanup around bonus rolls, faceoff layout stability, and rematch UX
 
 ## Documentation Map
 

@@ -9,6 +9,7 @@ import { LobbyManager } from '../services/lobbyManager.js';
 import { registerQueueHandlers } from './handlers/queue.js';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
+import { attachSocketServer, registerUserSocket, unregisterUserSocket } from './presence.js';
 import { TurnRunner } from '../services/turnRunner.js';
 import { getLegalMoves, type ClientToServerEvents, type ServerToClientEvents } from '@sennet/game-engine';
 import { logger } from '../utils/logger.js';
@@ -48,9 +49,7 @@ export function setupSocketIO(
   const queueManager = new QueueManager();
   const lobbyManager = new LobbyManager();
   const turnRunner  = new TurnRunner(io, gameManager);
-
-  // Track userId → socketId for messaging
-  const userSockets = new Map<string, string>();
+  attachSocketServer(io);
 
   // Authentication middleware
   io.use(async (socket, next) => {
@@ -81,7 +80,7 @@ export function setupSocketIO(
   io.on('connection', (rawSocket) => {
     const socket = rawSocket as AuthenticatedSocket;
     const userId = socket.data.user.userId;
-    userSockets.set(userId, socket.id);
+    registerUserSocket(userId, socket.id);
     logger.debug({ userId, socketId: socket.id }, '[socket] Connected');
 
     // Rate-limit wrapper
@@ -102,8 +101,12 @@ export function setupSocketIO(
       if (playerId) {
         logger.info({ userId, gameId: activeGame.gameId, playerId, turnPhase: activeGame.state.turnPhase }, '[socket] Reconnect');
         turnRunner.cancelDisconnectTimer(userId);
-        gameManager.reconnectPlayer(activeGame, userId, socket.id);
+        gameManager.reconnectPlayer(activeGame, userId, socket.id, {
+          displayName: socket.data.displayName,
+          houseColor: socket.data.houseColor,
+        });
         socket.join(activeGame.gameId);
+        turnRunner.emitStateToAll(activeGame);
 
         // If the game is in move phase and it's this player's turn, resend
         // GAME_ROLL_RESULT first so the client has the legal moves.
@@ -127,13 +130,13 @@ export function setupSocketIO(
     }
 
     // Register event handlers
-    registerQueueHandlers(socket, io, queueManager, lobbyManager, gameManager, userSockets, turnRunner, withRateLimit);
-    registerLobbyHandlers(socket, io, lobbyManager, queueManager, gameManager, userSockets, turnRunner, withRateLimit);
+    registerQueueHandlers(socket, io, queueManager, lobbyManager, gameManager, turnRunner, withRateLimit);
+    registerLobbyHandlers(socket, io, lobbyManager, queueManager, gameManager, turnRunner, withRateLimit);
     registerGameHandlers(socket, io, queueManager, lobbyManager, gameManager, turnRunner, withRateLimit);
 
     socket.on('disconnect', () => {
       logger.debug({ userId }, '[socket] Disconnected');
-      userSockets.delete(userId);
+      unregisterUserSocket(userId, socket.id);
       queueManager.leaveBySocket(socket.id);
       lobbyManager.removeUser(userId);
       turnRunner.handleDisconnectForfeit(userId);

@@ -52,10 +52,10 @@ export function GameView() {
 
   // On mount, request rejoin from server in case we refreshed
   useEffect(() => {
-    if (!gameState && !inGame) {
+    if (connected && !gameState) {
       requestRejoin();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [connected, gameState, requestRejoin]);
 
   // Clear selection when legal moves change
   useEffect(() => {
@@ -82,64 +82,27 @@ export function GameView() {
     navigate('/');
   }, [resetGame, navigate]);
 
-  // Waiting for game state (matched but state hasn't arrived yet)
-  if (inGame && (!gameState || !yourPlayer)) {
-    return (
-      <div className="game-view">
-        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <p>Loading game...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Socket not yet connected — show connecting state instead of "No active game"
-  if (!connected && !inGame && !gameState) {
-    return (
-      <div className="game-view">
-        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <p>Connecting...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Not in a game — no active game on server either
-  if (!gameState || !yourPlayer) {
-    return (
-      <div className="game-view">
-        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <p>No active game.</p>
-          <button className="btn-primary" onClick={() => navigate('/')} style={{ marginTop: '1rem' }}>
-            Back to Lobby
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const isYourTurn = gameState.currentPlayer === yourPlayer;
-  const canRoll = isYourTurn && gameState.turnPhase === 'roll' && gameState.phase === 'playing';
-  const canMove = isYourTurn && gameState.turnPhase === 'move' && legalMoves.length > 0;
-
-  // Faceoff: can this player roll?
-  const isFaceoff = gameState.phase === 'initial_roll';
-  const yourFaceoffRoll = faceoffRolls?.[yourPlayer] ?? null;
+  // Keep all hooks above the early-return branches below. On refresh, `GAME_STATE`
+  // can arrive after an initial loading render, and changing hook order here will
+  // crash the page before the rejoined game can display.
+  const hasActiveGame = !!gameState && !!yourPlayer;
+  const isYourTurn = hasActiveGame ? gameState.currentPlayer === yourPlayer : false;
+  const canRoll = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'roll';
+  const canMove = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'move' && legalMoves.length > 0;
+  const isFaceoff = gameState?.phase === 'initial_roll';
+  const yourFaceoffRoll = yourPlayer ? faceoffRolls?.[yourPlayer] ?? null : null;
   const oppPlayer = yourPlayer === 'player1' ? 'player2' : 'player1';
   const oppFaceoffRoll = faceoffRolls?.[oppPlayer] ?? null;
-  const canFaceoffRoll = isFaceoff && yourFaceoffRoll === null;
-  const isMovePhase = gameState.phase === 'playing' && gameState.turnPhase === 'move';
+  const canFaceoffRoll = !!isFaceoff && yourFaceoffRoll === null;
+  const isMovePhase = gameState?.phase === 'playing' && gameState.turnPhase === 'move';
   const activeDeadline = isMovePhase ? moveDeadline : rollDeadlineAt;
   const deadlineWindowSeconds = isMovePhase ? 13 : 5;
-
-  // Borne-off counts
-  const yourBorneOff = gameState.pieces.filter(
-    p => p.owner === yourPlayer && p.position === BEAR_OFF_POSITION
-  ).length;
-  const opponentBorneOff = gameState.pieces.filter(
-    p => p.owner !== yourPlayer && p.position === BEAR_OFF_POSITION
-  ).length;
-
+  const yourBorneOff = hasActiveGame
+    ? gameState.pieces.filter(p => p.owner === yourPlayer && p.position === BEAR_OFF_POSITION).length
+    : 0;
+  const opponentBorneOff = hasActiveGame
+    ? gameState.pieces.filter(p => p.owner !== yourPlayer && p.position === BEAR_OFF_POSITION).length
+    : 0;
   const eventNotice = lastEvent === 'blocked'
     ? { tone: 'blocked', text: 'Blocked! No legal moves — turn skipped.' }
     : lastEvent === 'house_of_netting'
@@ -154,7 +117,7 @@ export function GameView() {
   const canBearOffSelected = canMove && !!selectedPiece && legalMoves.some(
     m => m.pieceId === selectedPiece && m.to === BEAR_OFF_POSITION
   );
-  const yourBonusRolls = gameState.currentPlayer === yourPlayer ? gameState.extraRolls : 0;
+  const yourBonusRolls = hasActiveGame && gameState.currentPlayer === yourPlayer ? gameState.extraRolls : 0;
 
   const clearRollAnimation = useCallback(() => {
     if (rollAnimIntervalRef.current !== null) {
@@ -219,6 +182,42 @@ export function GameView() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [canRoll, canFaceoffRoll, handleRollAction]);
+
+  // Waiting for game state (matched but state hasn't arrived yet)
+  if (inGame && (!gameState || !yourPlayer)) {
+    return (
+      <div className="game-view">
+        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+          <p>Loading game...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Socket not yet connected — show connecting state instead of "No active game"
+  if (!connected && !inGame && !gameState) {
+    return (
+      <div className="game-view">
+        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+          <p>Connecting...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not in a game — no active game on server either
+  if (!gameState || !yourPlayer) {
+    return (
+      <div className="game-view">
+        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+          <p>No active game.</p>
+          <button className="btn-primary" onClick={() => navigate('/')} style={{ marginTop: '1rem' }}>
+            Back to Lobby
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderBorneCount = (count: number, color: string) => (
     <span className="borne-count" aria-label={`${count} of 5 borne off`}>

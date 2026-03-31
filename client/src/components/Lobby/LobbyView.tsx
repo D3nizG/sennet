@@ -4,7 +4,11 @@ import { useSocket } from '../../context/SocketContext';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
-import type { LobbyUpdatePayload, LobbyInvitePayload, AIDifficulty } from '@sennet/game-engine';
+import type {
+  LobbyUpdatePayload,
+  LobbyInvitePayload,
+  AIDifficulty,
+} from '@sennet/game-engine';
 import './LobbyView.css';
 
 export function LobbyView() {
@@ -24,6 +28,19 @@ export function LobbyView() {
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium');
   const [error, setError] = useState('');
   const [invite, setInvite] = useState<LobbyInvitePayload | null>(null);
+
+  const loadFriends = useCallback(async () => {
+    try {
+      const [friendsRes, pendingRes] = await Promise.all([
+        api.getFriends(),
+        api.getPendingRequests(),
+      ]);
+      setFriends(friendsRes.friends);
+      setPendingRequests(pendingRes.requests);
+    } catch {
+      // Keep current UI state when refresh fails.
+    }
+  }, []);
 
   // Navigate to /game when GameProvider sets inGame (via QUEUE_MATCHED)
   useEffect(() => {
@@ -46,9 +63,8 @@ export function LobbyView() {
 
   // Load friends
   useEffect(() => {
-    api.getFriends().then(d => setFriends(d.friends)).catch(() => {});
-    api.getPendingRequests().then(d => setPendingRequests(d.requests)).catch(() => {});
-  }, []);
+    void loadFriends();
+  }, [loadFriends]);
 
   // Socket event listeners (lobby-specific only; game events handled by GameProvider)
   useEffect(() => {
@@ -62,6 +78,10 @@ export function LobbyView() {
       setInvite(data);
     };
 
+    const onFriendsUpdated = () => {
+      void loadFriends();
+    };
+
     const onError = (data: { code: string; message: string }) => {
       setError(data.message);
       setTimeout(() => setError(''), 4000);
@@ -69,14 +89,16 @@ export function LobbyView() {
 
     socket.on('LOBBY_UPDATE', onLobbyUpdate);
     socket.on('LOBBY_INVITE_RECEIVED', onInvite);
+    socket.on('FRIENDS_UPDATED', onFriendsUpdated);
     socket.on('GAME_ERROR', onError);
 
     return () => {
       socket.off('LOBBY_UPDATE', onLobbyUpdate);
       socket.off('LOBBY_INVITE_RECEIVED', onInvite);
+      socket.off('FRIENDS_UPDATED', onFriendsUpdated);
       socket.off('GAME_ERROR', onError);
     };
-  }, [socket]);
+  }, [socket, loadFriends]);
 
   const handleQuickMatch = useCallback(() => {
     if (queuing) {
@@ -122,32 +144,29 @@ export function LobbyView() {
       await api.addFriend(friendUsername.trim());
       setFriendUsername('');
       setError('');
+      await loadFriends();
     } catch (err: any) {
       setError(err.message);
     }
-  }, [friendUsername]);
+  }, [friendUsername, loadFriends]);
 
   const handleRespondFriend = useCallback(async (friendshipId: string, accept: boolean) => {
     try {
       await api.respondFriend(friendshipId, accept);
-      setPendingRequests(prev => prev.filter(p => p.friendshipId !== friendshipId));
-      if (accept) {
-        const res = await api.getFriends();
-        setFriends(res.friends);
-      }
+      await loadFriends();
     } catch (err: any) {
       setError(err.message);
     }
-  }, []);
+  }, [loadFriends]);
 
   const handleRemoveFriend = useCallback(async (friendshipId: string) => {
     try {
       await api.removeFriend(friendshipId);
-      setFriends(prev => prev.filter(f => f.friendshipId !== friendshipId));
+      await loadFriends();
     } catch (err: any) {
       setError(err.message);
     }
-  }, []);
+  }, [loadFriends]);
 
   const handleInviteFriendToGame = useCallback((friendId: string) => {
     if (!lobby) {

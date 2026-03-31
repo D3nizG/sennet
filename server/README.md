@@ -6,6 +6,7 @@ Express + Socket.IO backend for authentication, profiles, friendships, matchmaki
 
 - authenticate users for both REST and realtime traffic
 - expose `/api/auth`, `/api/profile`, and `/api/friends`
+- push live friend-list updates and profile-driven color changes into active client sessions
 - manage quick-match queue and private lobby state
 - run faceoff, roll, move, timeout, reconnect, and resign orchestration
 - persist completed games and user stats through Prisma
@@ -13,11 +14,12 @@ Express + Socket.IO backend for authentication, profiles, friendships, matchmaki
 ## Key Modules
 
 - `src/app.ts`: Express middleware, REST route registration, and `/health`
-- `src/socket/index.ts`: Socket.IO bootstrap, handshake auth, reconnect handling
+- `src/socket/index.ts`: Socket.IO bootstrap, handshake auth, reconnect handling, and presence tracking
 - `src/services/gameManager.ts`: active game registry and persistence
 - `src/services/turnRunner.ts`: timers, faceoff, AI pacing, and game completion flow
 - `src/services/queueManager.ts`: quick-match queue
 - `src/services/lobbyManager.ts`: private lobby state
+- `src/socket/presence.ts`: user-to-socket lookup for targeted live updates
 - `src/routes/`: auth, profile, and friend APIs
 
 ## Runtime Notes
@@ -26,6 +28,7 @@ Express + Socket.IO backend for authentication, profiles, friendships, matchmaki
 - active games are still stored in memory
 - the server is the only authority allowed to mutate game state
 - the client only sends gameplay intent
+- friend-list updates are emitted live over Socket.IO rather than waiting for a manual refresh
 
 ## Development
 

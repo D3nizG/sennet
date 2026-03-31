@@ -9,7 +9,7 @@ Shared TypeScript package for Senet rules, AI move selection, and the typed Sock
 - legal move generation, including forced backward moves
 - capture, protection, blockade, special-square, and bear-off rules
 - heuristic AI move selection
-- shared event payload types for the realtime protocol
+- shared event payload types for the realtime protocol, including gameplay and live friend-state updates
 
 ## Main API
 

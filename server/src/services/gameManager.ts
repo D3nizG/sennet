@@ -264,10 +264,19 @@ export class GameManager {
   }
 
   /** Update socket ID for a reconnecting player. */
-  reconnectPlayer(game: ActiveGame, userId: string, newSocketId: string): PlayerId | null {
+  reconnectPlayer(
+    game: ActiveGame,
+    userId: string,
+    newSocketId: string,
+    profile?: { displayName: string; houseColor: string },
+  ): PlayerId | null {
     for (const pid of ['player1', 'player2'] as PlayerId[]) {
       if (game.players[pid].userId === userId) {
         game.players[pid].socketId = newSocketId;
+        if (profile) {
+          game.players[pid].displayName = profile.displayName;
+          game.players[pid].houseColor = profile.houseColor;
+        }
         return pid;
       }
     }

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { api } from '../../services/api';
 import './ProfileView.css';
 
 export function ProfileView() {
-  const { user, updateUser } = useAuth();
+  const { updateUser } = useAuth();
+  const { socket } = useSocket();
   const [profile, setProfile] = useState<any>(null);
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
@@ -25,6 +27,10 @@ export function ProfileView() {
       const res = await api.updateProfile({ displayName, houseColor });
       updateUser({ displayName: res.displayName, houseColor: res.houseColor });
       setProfile((prev: any) => ({ ...prev, displayName: res.displayName, houseColor: res.houseColor }));
+      if (socket) {
+        socket.disconnect();
+        socket.connect();
+      }
       setEditing(false);
     } catch (err) {
       console.error(err);

@@ -8,7 +8,7 @@
 - the current client stores the token in `localStorage`
 - passwords are hashed with bcrypt using 12 rounds
 
-`localStorage` is a deliberate tradeoff here for a game-oriented SPA, not the highest-security option. If the deployment target or threat model changes, moving to HttpOnly cookies would be the next hardening step.
+`localStorage` is a deliberate tradeoff here for a game-oriented SPA, not the highest-security option. Near-term roadmap work includes reevaluating the auth/session model around proper email-backed auth and potentially Supabase Auth/OAuth for production.
 
 ## Authorization
 
@@ -61,14 +61,16 @@ The current `/health` endpoint is intentionally lightweight and does not expose 
 
 - JWTs in `localStorage` remain vulnerable to XSS if the client is compromised
 - active game state is in memory, so restart recovery is limited
-- there is no CAPTCHA, email verification, or account lockout layer
+- there is no CAPTCHA, email verification, password reset, or account lockout layer
 - there is no external anomaly monitoring or audit trail yet
+- the repo does not yet have a finalized production auth provider or OAuth story
 
 ## Production Recommendations
 
 1. Use a strong `JWT_SECRET` with at least 32 random characters.
 2. Serve the app only over HTTPS.
 3. If moving away from `localStorage`, prefer HttpOnly secure cookies with explicit `sameSite` policy.
-4. Tighten CSP for the final deployment origin rather than relying only on defaults.
-5. Use pooled and direct Postgres URLs intentionally when deploying behind a managed database platform.
-6. Add external monitoring for auth abuse, repeated socket throttling, and unhandled exceptions.
+4. If adopting Supabase Auth or another hosted auth layer, document which flows remain first-party and which are delegated.
+5. Tighten CSP for the final deployment origin rather than relying only on defaults.
+6. Use pooled and direct Postgres URLs intentionally when deploying behind a managed database platform.
+7. Add external monitoring for auth abuse, repeated socket throttling, and unhandled exceptions.
