@@ -9,8 +9,6 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      - key: NPM_CONFIG_PRODUCTION
-        value: "false"
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
