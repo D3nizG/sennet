@@ -2,46 +2,56 @@
 
 ## Scope
 
-The repository uses Vitest for unit and integration testing across:
+The repo currently has automated tests for:
 
-- `packages/game-engine` (pure rules engine)
-- `server` (services, middleware, socket payload validation, integration flow)
+- `packages/game-engine`: pure gameplay rules and helpers
+- `server`: route wiring, services, orchestration, validation, and integration behavior
 
-The client currently has no dedicated automated test suite in this repository.
+The client currently has no automated test suite.
 
 ## Commands
 
-From repository root:
+Run the full automated suite from the repo root:
 
 ```bash
 npm test
 ```
 
-Target individual workspaces:
+Run individual workspace suites:
 
 ```bash
 npm run test:engine
 npm run test:server
 ```
 
-Direct workspace runs:
+Or call the workspace scripts directly:
 
 ```bash
 npm run test -w @sennet/game-engine
 npm run test -w server
 ```
 
+## What CI Runs
+
+The GitHub Actions workflow at `.github/workflows/ci.yml` currently does the following:
+
+1. installs dependencies
+2. builds the shared game engine
+3. type-checks server and client
+4. runs `npm test`
+5. builds server and client
+
+The current workflow does not run any client-specific test suite because none exists yet.
+
 ## Coverage Reporting
 
-Vitest coverage requires `@vitest/coverage-v8`.
-
-Install:
+If you want coverage locally, add Vitest's V8 coverage package:
 
 ```bash
 npm i -D @vitest/coverage-v8
 ```
 
-Run with coverage:
+Then run coverage per workspace:
 
 ```bash
 npm run test -w @sennet/game-engine -- --coverage
@@ -50,28 +60,39 @@ npm run test -w server -- --coverage
 
 ## Current Test Surface
 
-### Game Engine (`packages/game-engine/src/__tests__`)
+### Game Engine
 
-- `engine.test.ts`: game lifecycle, turn flow, special squares, winner checks
-- `moves.test.ts`: legal move generation, captures, blockades, forced backward moves
-- `board.test.ts`: board mapping, adjacency/protection/blockade/path helpers, coordinate mapping
+`packages/game-engine/src/__tests__/`
+
+- `engine.test.ts`: game lifecycle, turn flow, special squares, and winner checks
+- `moves.test.ts`: legal move generation, captures, blockades, and forced backward moves
+- `board.test.ts`: board mapping, adjacency, protection, blockade, and path helpers
 - `rolls.test.ts`: seeded RNG determinism and roll metadata
-- `types.test.ts`: row/opponent/roll helper utilities
-- `ai.test.ts`: AI move selection across easy/medium/hard and edge cases
+- `types.test.ts`: helper utilities and constants
+- `ai.test.ts`: AI move selection behavior
 
-### Server (`server/src/__tests__`)
+### Server
 
-- `game.test.ts`: server integration flow with shared engine
-- `turnRunner.test.ts`: faceoff, timeout, roll, move, resign orchestration
-- `gameManager.test.ts`: game creation, roll/move delegation, persistence and cleanup behavior
-- `aiPlayer.test.ts`: AI turn loop actions (roll, blocked, move, game-over)
-- `queueManager.test.ts`: queue membership and matching behavior
-- `lobbyManager.test.ts`: lobby lifecycle and mapping cleanup
-- `auth.test.ts`: token creation/verification and auth middleware behavior
-- `socketEvents.test.ts`: zod validation of client->server event payloads
-- `rng.test.ts`: secure roll and lobby code generation constraints
-- `app.test.ts`: app route/middleware registration sanity checks
+`server/src/__tests__/`
 
-## CI Recommendation
+- `app.test.ts`: app route and middleware registration
+- `auth.test.ts`: token and auth middleware behavior
+- `game.test.ts`: integration flow around the shared engine
+- `gameManager.test.ts`: game creation, persistence, reconnect, and cleanup behavior
+- `turnRunner.test.ts`: faceoff, timers, resign, timeout, and orchestration behavior
+- `aiPlayer.test.ts`: AI turn sequencing
+- `queueManager.test.ts`: queue membership and matching
+- `lobbyManager.test.ts`: lobby lifecycle and membership cleanup
+- `socketEvents.test.ts`: socket payload validation
+- `rng.test.ts`: secure roll and lobby code generation
 
-Use the root `npm test` command in CI and add coverage gates after enabling `@vitest/coverage-v8`.
+## Known Gap
+
+The biggest testing gap is still the client:
+
+- no component tests
+- no provider tests
+- no lobby/game flow tests
+- no reconnect/timer UI coverage
+
+That gap is intentionally tracked in [`todo.md`](./todo.md) and [`ROADMAP.md`](./ROADMAP.md).

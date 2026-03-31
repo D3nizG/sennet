@@ -1,60 +1,131 @@
-Description: Use this skill for game engine logic, initial board setup, and movement validation.
+# Sennet Core Logic
 
-1. Board Geometry & Layout
-The board is a 3x10 grid (30 squares total) navigated in a "snake" pattern.
+This document is the long-form rules reference for the implementation in `packages/game-engine/`.
 
-Row 1 (Indices 0-9): Left to Right.
+## 1. Board Geometry
 
-Row 2 (Indices 10-19): Right to Left.
+The board has 30 playable squares indexed `0` through `29`.
 
-Row 3 (Indices 20-29): Left to Right.
+- row 1: `0` to `9`, left to right
+- row 2: `10` to `19`, right to left when rendered
+- row 3: `20` to `29`, left to right
 
-2. Initial Setup (The Alternating Start)
-Pieces are placed on the first row (Indices 0-9) in alternating order:
+Movement follows the square index order rather than screen direction.
 
-Player 1 (Starter): Occupies Even numbers / Odd indices (1, 3, 5, 7, 9).
+## 2. Faceoff And Initial Placement
 
-Player 2: Occupies Odd numbers / Even indices (0, 2, 4, 6, 8).
+Games start in an `initial_roll` phase with an empty board.
 
-Note: The player who rolls a "1" first in the pre-game roll-off becomes Player 1 and takes the even-numbered squares.
+- both players roll simultaneously
+- the first player to roll an exclusive `1` wins the faceoff
+- ties and non-winning rounds repeat until the faceoff is decided
 
-3. Absolute Safety Rules
-Safety is binary in this game. There is no "partially safe" status.
+When the faceoff is decided:
 
-The ONLY Safe Squares: 27, 28, and 29. Pieces here cannot be captured or swapped.
+- the winner becomes the opening player
+- the winner's pieces are placed on odd starting indices: `1, 3, 5, 7, 9`
+- the other player's pieces are placed on even starting indices: `0, 2, 4, 6, 8`
 
-Combat Zone: All other squares (0-26), including special squares like 14 and 25, are unsafe. Pieces here can be swapped/eaten unless protected by a Row-Blockade.
+The starter may be either `player1` or `player2`; the faceoff winner gets the odd indices regardless of label.
 
-4. Movement & The "Dice"
-1, 4, 5: Move and Roll Again.
+## 3. Roll Rules
 
-2, 3: Move and end turn.
+The game uses integer roll values from `1` to `6`.
 
-6: No movement; simply roll again.
+- `1`, `4`, `5`: the player moves, then earns another roll
+- `2`, `3`: the player moves, then the turn ends
+- `6`: no movement occurs and the same player rolls again
 
-The Row-Break Rule: Protection (2 pieces) or Blockades (3+ pieces) only function if the pieces are on the same horizontal row. Row transitions (9 to 10 and 19 to 20) offer zero protection.
+The server generates all rolls.
 
-5. Special Squares & Penalties
-13 (House of Netting): Ends turn immediately. All bonuses/rerolls lost.
+## 4. Legal Movement
 
-14 & 25 (Bonus Squares): Grant +1 extra roll. These are not safe; you can be eaten off these squares.
+Each player controls five pieces.
 
-26 (Waters of Chaos): Piece resets to 13. If 13 is occupied, it resets to 0. If 0 is occupied, it takes the next available square (1, 2, 3...). Turn ends immediately.
+- forward movement is attempted first
+- if no forward move is legal, backward movement becomes mandatory
+- if no forward or backward move exists, the turn is blocked and skipped
+- a piece may not land on a square already occupied by a friendly piece
+- bearing off requires an exact move to the virtual exit square `30`
 
-6. Forced Moves & Winning
-Mandatory Moves: If no forward move is possible, you must move backward.
+## 5. Capture, Protection, And Blockades
 
-Jail (Blocked): If no forward or backward move exists, the turn is skipped (Trigger "Jail Cell" UI).
+### Capture
 
-Bearing Off: Pieces can exit the board from the final row (20-29) individually with an exact roll to reach "Square 30".
+Landing on a lone opposing piece captures by swapping positions with that piece.
 
-7. Multiplayer Turn Timers (Online Only)
-These timer rules apply only to Multiplayer/Online games. No timers are used in local single-player vs AI.
+### Protection
 
-Move Timer: After a player rolls (and movement is possible), they have 24 seconds to choose and execute a move.
+Two contiguous pieces owned by the same player in the same row are protected. A protected piece cannot be captured.
 
-Auto-Move on Timeout: If the 24 seconds expire before the player moves, the server will select and execute a random legal move from that player’s available moves for the current roll.
+### Blockade
 
-No-Move Exception: If no legal move exists (forward or backward), the turn is skipped as normal (Jail/Blocked). This does not trigger an auto-move.
+Three or more contiguous same-owner pieces in the same row form a blockade.
 
-Auto-Resign: If a player times out (i.e., triggers an auto-move due to inactivity) for 3 consecutive move decisions, they automatically resign the game.
+A blockade blocks movement:
+
+- through the blocked squares
+- onto the blocked squares
+- across the path to bear off
+
+### Row Break Rule
+
+Adjacency only counts inside a row.
+
+- `9` and `10` are not adjacent for protection or blockade purposes
+- `19` and `20` are not adjacent for protection or blockade purposes
+
+## 6. Safe And Special Squares
+
+### Safe Squares
+
+Squares `27`, `28`, and `29` are safe. Pieces on those squares cannot be captured.
+
+### House of Netting
+
+Square `13` ends the turn immediately and clears any accumulated extra rolls.
+
+### Bonus Squares
+
+Squares `14` and `25` each grant one extra roll when landed on.
+
+These squares are not safe.
+
+### Waters of Chaos
+
+Square `26` washes the moved piece backward and ends the turn immediately.
+
+The relocation order is:
+
+1. square `13`
+2. square `0` if `13` is occupied
+3. the next free square starting from `1` and scanning upward, wrapping if needed
+
+## 7. Bearing Off And Victory
+
+- a piece may bear off only from the final row
+- the roll must land the piece exactly on the virtual square `30`
+- the first player to bear off all five pieces wins
+
+## 8. Multiplayer Runtime Rules
+
+These behaviors are enforced by the server in multiplayer games:
+
+- 5 second timer to click roll
+- 13 second timer to choose a move once legal moves are available
+- automatic roll if the player does not roll in time
+- automatic random legal move if the player does not move in time
+- automatic loss after three consecutive move timeouts
+- 15 second disconnect grace window before disconnect forfeit
+
+AI games use the same rules engine but do not run the human multiplayer timer model.
+
+## 9. Source Mapping
+
+Implementation references:
+
+- `packages/game-engine/src/engine.ts`
+- `packages/game-engine/src/moves.ts`
+- `packages/game-engine/src/board.ts`
+- `packages/game-engine/src/types.ts`
+- `server/src/services/turnRunner.ts`

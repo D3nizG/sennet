@@ -1,23 +1,30 @@
 # sennet-client
 
-React + Vite frontend for Sennet gameplay, lobby flow, and profile management.
+React 19 + Vite frontend for authentication, lobby flow, active gameplay, chat, and player profile views.
 
 ## Responsibilities
 
-- Authentication UX and token/session handling
-- Lobby, queue, and in-game interfaces
-- Realtime Socket.IO event consumption and state rendering
-- Local legal-move highlighting based on server-emitted game state
+- store and hydrate the authenticated user session
+- open and maintain the Socket.IO connection
+- render lobby, private lobby, AI launch, and friend-management flows
+- render the active board, timers, move hints, chat, and end-of-game states
+- render profile stats and recent game history
 
 ## Key Modules
 
-- `src/context/AuthContext.tsx`: auth state and API session handling
-- `src/context/SocketContext.tsx`: socket connection lifecycle
-- `src/context/GameContext.tsx`: shared game state container
-- `src/hooks/useGame.ts`: game event orchestration hook
-- `src/components/Board/Board.tsx`: board rendering and interaction
-- `src/components/Game/GameView.tsx`: game flow UI
-- `src/components/Lobby/LobbyView.tsx`: matchmaking and private lobby UX
+- `src/context/AuthContext.tsx`: token and user state
+- `src/context/SocketContext.tsx`: singleton socket lifecycle
+- `src/context/GameContext.tsx`: shared game session state and socket subscriptions
+- `src/components/Lobby/LobbyView.tsx`: quick match, AI, private lobbies, invites, and friends
+- `src/components/Game/GameView.tsx`: faceoff, board interaction, timers, chat, and game-over flow
+- `src/components/Board/Board.tsx`: board rendering and move target highlighting
+- `src/components/Profile/ProfileView.tsx`: profile editing and stats/history display
+
+## Routes
+
+- `/`: lobby
+- `/game`: active game
+- `/profile`: profile
 
 ## Development
 
@@ -25,3 +32,9 @@ React + Vite frontend for Sennet gameplay, lobby flow, and profile management.
 npm run dev -w client
 npm run build -w client
 ```
+
+The client expects the backend on `http://localhost:3001` during development and proxies `/api` plus `/socket.io` through Vite.
+
+## Current Gap
+
+There is still no dedicated automated client test suite in this workspace.
