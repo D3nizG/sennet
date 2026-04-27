@@ -1,0 +1,54 @@
+.egypt-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-color: var(--egypt-bg);
+}
+
+.egypt-shell--no-scroll {
+  overflow: hidden;
+  height: 100vh;
+}
+
+.egypt-shell__overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(5, 11, 22, 0.74) 0%,
+    rgba(5, 11, 22, 0.52) 45%,
+    rgba(5, 11, 22, 0.74) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.egypt-shell__vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 38%,
+    rgba(3, 8, 18, 0.68) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.egypt-shell__content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  padding-top: 4.5rem; /* clear fixed GameHeader */
+}
+
+.egypt-shell--center .egypt-shell__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}

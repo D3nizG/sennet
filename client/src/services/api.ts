@@ -13,10 +13,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const data = await res.json();
+
+  let data: any;
+  try {
+    data = await res.json();
+  } catch {
+    if (!res.ok) {
+      if (res.status === 401) window.dispatchEvent(new Event('auth:unauthorized'));
+      throw new Error(`Server error (${res.status})`);
+    }
+    throw new Error('Unexpected server response');
+  }
+
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event('auth:unauthorized'));
-    throw new Error(data.error || 'Request failed');
+    throw new Error(data?.error || `Request failed (${res.status})`);
   }
   return data as T;
 }

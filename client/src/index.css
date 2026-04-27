@@ -1,5 +1,5 @@
 :root {
-  /* Egyptian-inspired color palette */
+  /* Legacy palette — kept for existing components */
   --gold: #D4AF37;
   --gold-light: #F0D060;
   --gold-dark: #A88B2B;
@@ -21,10 +21,113 @@
   --text-muted: #A8B2C1;
   --border: rgba(212, 175, 55, 0.3);
 
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  /* ── Egyptian Fantasy Design System ── */
+  --egypt-bg: #050b16;
+  --egypt-navy-950: #050b16;
+  --egypt-navy-900: #071321;
+  --egypt-navy-850: #0a1a2d;
+  --egypt-navy-800: #0d2742;
+
+  --egypt-panel: rgba(7, 19, 33, 0.92);
+  --egypt-panel-soft: rgba(13, 39, 66, 0.72);
+  --egypt-panel-deep: rgba(3, 10, 20, 0.96);
+
+  --egypt-gold: #d8a93a;
+  --egypt-gold-bright: #f4cf75;
+  --egypt-gold-dark: #8a5e1f;
+  --egypt-gold-muted: rgba(216, 169, 58, 0.62);
+
+  --egypt-parchment: #d7b46a;
+  --egypt-parchment-light: #ecd18a;
+
+  --egypt-text-main: #f6d98a;
+  --egypt-text-soft: #d8d2c4;
+  --egypt-text-muted: #9fa7b5;
+
+  --egypt-win: #38d27a;
+  --egypt-loss: #ef4d4d;
+
+  --egypt-border: rgba(232, 181, 71, 0.78);
+  --egypt-border-soft: rgba(232, 181, 71, 0.38);
+
+  --egypt-shadow-deep: 0 22px 70px rgba(0, 0, 0, 0.52);
+  --egypt-shadow-gold: 0 0 24px rgba(216, 169, 58, 0.22);
+
+  --egypt-radius-lg: 18px;
+  --egypt-radius-md: 12px;
+  --egypt-radius-sm: 8px;
+
+  --egypt-input-bg: rgba(5, 11, 22, 0.85);
+
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   color: var(--text);
   background-color: var(--bg);
+}
+
+/* ── Egyptian font utilities ── */
+.egypt-display {
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  color: var(--egypt-text-main);
+  letter-spacing: 0.05em;
+}
+
+.egypt-heading {
+  font-family: 'Cinzel', serif;
+  font-weight: 500;
+  color: var(--egypt-text-main);
+  letter-spacing: 0.03em;
+}
+
+.egypt-body {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--egypt-text-soft);
+}
+
+.egypt-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--egypt-text-muted);
+}
+
+.egypt-muted {
+  color: var(--egypt-text-muted);
+  font-size: 0.85rem;
+}
+
+.gold-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--egypt-gold), transparent);
+  opacity: 0.6;
+}
+
+/* ── egypt-scrollbar: apply to any scrollable container for themed scrollbars ── */
+.egypt-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--egypt-gold-muted) transparent;
+}
+
+.egypt-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.egypt-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.egypt-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--egypt-gold-muted);
+  border-radius: 3px;
+}
+
+.egypt-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--egypt-gold);
 }
 
 * {

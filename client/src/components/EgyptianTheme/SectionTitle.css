@@ -1,0 +1,25 @@
+.section-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.section-title--center {
+  align-items: center;
+  text-align: center;
+}
+
+.section-title--left {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.section-title__text {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.section-title__sub {
+  margin-top: 0.1rem;
+}

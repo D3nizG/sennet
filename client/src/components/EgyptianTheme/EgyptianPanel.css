@@ -1,0 +1,40 @@
+.egypt-panel {
+  position: relative;
+  background: var(--egypt-panel);
+  border: 1px solid var(--egypt-border);
+  border-radius: var(--egypt-radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--egypt-shadow-deep), var(--egypt-shadow-gold);
+  backdrop-filter: blur(14px);
+}
+
+/* subtle inner border */
+.egypt-panel::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: calc(var(--egypt-radius-lg) - 4px);
+  border: 1px solid var(--egypt-border-soft);
+  pointer-events: none;
+}
+
+.egypt-panel--deep {
+  background: var(--egypt-panel-deep);
+}
+
+.egypt-panel--soft {
+  background: var(--egypt-panel-soft);
+  border-color: var(--egypt-border-soft);
+  box-shadow: var(--egypt-shadow-deep);
+}
+
+/* tiny corner star ornament */
+.egypt-panel--ornament::after {
+  content: '✦';
+  position: absolute;
+  top: 11px;
+  right: 15px;
+  font-size: 0.65rem;
+  color: var(--egypt-gold-muted);
+  pointer-events: none;
+}

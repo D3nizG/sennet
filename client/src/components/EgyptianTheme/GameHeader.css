@@ -1,0 +1,123 @@
+.egypt-site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(180deg, rgba(5, 11, 22, 0.88) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.egypt-site-header > * {
+  pointer-events: auto;
+}
+
+/* ── Brand mark ── */
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--egypt-radius-sm);
+  cursor: pointer;
+  transition: opacity 0.2s;
+  text-decoration: none;
+}
+
+.brand-mark:hover {
+  opacity: 0.8;
+}
+
+.brand-mark__icon {
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--egypt-text-main);
+  filter: drop-shadow(0 0 8px rgba(216, 169, 58, 0.55));
+}
+
+.brand-mark__name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--egypt-text-main);
+  letter-spacing: 0.07em;
+  text-shadow: 0 0 14px rgba(216, 169, 58, 0.38);
+}
+
+/* ── User nameplate ── */
+.user-nameplate {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--egypt-panel);
+  border: 1px solid var(--egypt-border-soft);
+  border-radius: var(--egypt-radius-md);
+  padding: 0.38rem 0.5rem 0.38rem 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  backdrop-filter: blur(12px);
+}
+
+.user-nameplate:hover {
+  border-color: var(--egypt-border);
+  box-shadow: var(--egypt-shadow-gold);
+}
+
+.user-nameplate__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.user-nameplate__name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--egypt-text-soft);
+  line-height: 1.2;
+}
+
+.user-nameplate__handle {
+  font-size: 0.72rem;
+  color: var(--egypt-text-muted);
+}
+
+/* ── Avatar medallion ── */
+.avatar-medallion {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--avatar-color, var(--egypt-gold));
+  border: 2px solid var(--egypt-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(216, 169, 58, 0.28);
+  flex-shrink: 0;
+}
+
+.avatar-medallion__initial {
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #071321;
+  line-height: 1;
+}
+
+/* ── Responsive ── */
+@media (max-width: 500px) {
+  .egypt-site-header {
+    padding: 0.6rem 1rem;
+  }
+  .brand-mark__name {
+    font-size: 1.05rem;
+  }
+  .user-nameplate__handle {
+    display: none;
+  }
+}

@@ -1,0 +1,31 @@
+.egypt-btn {
+  background: var(--egypt-panel);
+  color: var(--egypt-text-main);
+  border: 1px solid var(--egypt-border-soft);
+  border-radius: var(--egypt-radius-md);
+  padding: 0.7rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.egypt-btn:hover:not(:disabled) {
+  border-color: var(--egypt-border);
+  box-shadow: var(--egypt-shadow-gold);
+  background: var(--egypt-panel-soft);
+}
+
+.egypt-btn:active:not(:disabled) {
+  opacity: 0.88;
+}
+
+.egypt-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.egypt-btn--full {
+  width: 100%;
+}
