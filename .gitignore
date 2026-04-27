@@ -58,6 +58,9 @@ coverage/
 # ─── Vite / Client ───────────────────────────────────────────────────────────
 client/dist/
 
+# ─── Reference Images ─────────────────────────────────────────────────────────
+/reference_images/
+
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 .cache/
 .parcel-cache/
@@ -65,5 +68,4 @@ client/dist/
 *.pid
 *.seed
 *.pid.lock
-
-ToDO.txt
+todo.md
