@@ -35,12 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    const handle = () => logout();
-    window.addEventListener('auth:unauthorized', handle);
-    return () => window.removeEventListener('auth:unauthorized', handle);
-  }, [logout]);
-
   const handleAuth = useCallback((res: AuthResponse) => {
     setToken(res.token);
     setUser(res.user);
@@ -64,6 +58,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('sennet_token');
     localStorage.removeItem('sennet_user');
   }, []);
+
+  useEffect(() => {
+    const handle = () => logout();
+    window.addEventListener('auth:unauthorized', handle);
+    return () => window.removeEventListener('auth:unauthorized', handle);
+  }, [logout]);
 
   const updateUser = useCallback((data: Partial<User>) => {
     setUser(prev => {
