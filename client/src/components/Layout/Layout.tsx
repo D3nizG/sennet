@@ -10,7 +10,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   return (
-    <div className="app-layout">
+    <div className="app-layout" data-route={location.pathname}>
       <header className="app-header">
         <Link to="/" className="brand">
           <span className="brand-icon">𓁹</span>

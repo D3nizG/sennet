@@ -99,6 +99,11 @@
   padding: 1rem;
 }
 
+.app-layout[data-route="/"] {
+  background: url('/background-water.png') center center / cover no-repeat fixed;
+  min-height: 100vh;
+}
+
 @media (max-width: 600px) {
   .app-header {
     flex-wrap: wrap;

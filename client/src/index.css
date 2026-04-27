@@ -36,7 +36,7 @@
 body {
   min-height: 100vh;
   min-width: 480px;
-  background: linear-gradient(135deg, var(--bg) 0%, #0a1628 50%, #16213E 100%);
+  background: url('/background.png') center center / cover no-repeat fixed;
 }
 
 button {
