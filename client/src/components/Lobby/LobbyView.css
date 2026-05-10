@@ -1,144 +1,368 @@
+/* ── Lobby page container ── */
 .lobby-view {
   max-width: 900px;
   margin: 0 auto;
-  padding: 1rem;
-}
-
-.lobby-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  padding: 1.25rem 1.25rem 3rem;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
-@media (max-width: 700px) {
-  .lobby-grid { grid-template-columns: 1fr; }
+/* ── Main ornate frame ── */
+.lobby-frame {
+  position: relative;
+  padding: 0;
+  overflow: visible; /* let corner ornaments bleed */
+  /* heavier, multi-layer gold border */
+  border: 3px solid var(--egypt-gold);
+  box-shadow:
+    0 0 0 1px var(--egypt-gold-dark),           /* outer hairline */
+    inset 0 0 0 2px var(--egypt-gold-dark),      /* inner hairline */
+    0 30px 80px rgba(0, 0, 0, 0.65),
+    0 0 40px rgba(216, 169, 58, 0.15);
 }
 
-.lobby-section {
+/* Clip the compartment grid to the frame radius */
+.lobby-frame > .lobby-compartments {
+  border-radius: calc(var(--egypt-radius-lg) - 4px);
+  overflow: hidden;
+}
+
+/* ── Corner ornaments ── */
+.lobby-corner {
+  position: absolute;
+  z-index: 10;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.lobby-corner::before,
+.lobby-corner::after {
+  content: '';
+  position: absolute;
+  background: var(--egypt-gold);
+}
+
+/* Horizontal bar of the corner cross */
+.lobby-corner::before {
+  width: 100%;
+  height: 2px;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+/* Vertical bar of the corner cross */
+.lobby-corner::after {
+  width: 2px;
+  height: 100%;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+/* Add a small diamond at center of each corner cross */
+.lobby-corner--tl,
+.lobby-corner--tr,
+.lobby-corner--bl,
+.lobby-corner--br {
+  display: block;
+}
+
+.lobby-corner--tl { top: -9px;  left: -9px; }
+.lobby-corner--tr { top: -9px;  right: -9px; }
+.lobby-corner--bl { bottom: -9px; left: -9px; }
+.lobby-corner--br { bottom: -9px; right: -9px; }
+
+/* Diamond dot at crossing point */
+.lobby-corner--tl::before,
+.lobby-corner--tr::before,
+.lobby-corner--bl::before,
+.lobby-corner--br::before {
+  box-shadow: 0 0 0 3px var(--egypt-navy-900), 0 0 0 5px var(--egypt-gold);
+  border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--egypt-gold-bright);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.lobby-corner--tl::after,
+.lobby-corner--tr::after,
+.lobby-corner--bl::after,
+.lobby-corner--br::after {
+  display: none; /* hide the vertical bar; we use box-shadow dot on ::before instead */
+}
+
+/* ── 2×2 carved compartment grid ── */
+.lobby-compartments {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(232, 181, 71, 0.55),
+    rgba(216, 169, 58, 0.35)
+  );
+}
+
+/* ── Individual compartment ── */
+.lobby-compartment {
+  background: linear-gradient(
+    160deg,
+    rgba(6, 16, 30, 0.97) 0%,
+    rgba(5, 11, 22, 0.99) 100%
+  );
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
+  min-height: 260px;
+  position: relative;
 }
 
-.lobby-section h2 {
-  color: var(--gold);
-  font-size: 1.1rem;
+.lobby-compartment--friends {
+  overflow: hidden;
 }
 
-.section-desc {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.searching {
-  color: var(--gold-light);
-  font-size: 0.8rem;
-  animation: blink 1.5s ease-in-out infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* AI options */
-.ai-options {
+/* ── Section header: large medallion + title ── */
+.lobby-sec-header {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 1rem;
 }
 
-.ai-options .btn-secondary.active {
-  background: rgba(212, 175, 55, 0.2);
-  border-color: var(--gold);
-  color: var(--gold);
+/* Heavier medallion treatment for lobby section icons */
+.lobby-sec-header .medallion-icon {
+  flex-shrink: 0;
+  border: 3px solid var(--egypt-gold);
+  background: radial-gradient(
+    circle at 38% 38%,
+    rgba(13, 39, 66, 0.9) 0%,
+    rgba(3, 10, 20, 0.98) 100%
+  );
+  box-shadow:
+    0 0 0 1px rgba(216, 169, 58, 0.2),
+    inset 0 0 0 3px rgba(7, 19, 33, 0.8),
+    0 0 24px rgba(216, 169, 58, 0.28),
+    0 6px 16px rgba(0, 0, 0, 0.5);
+  font-size: 2rem; /* override the lg default to fit nicely */
 }
 
-/* Lobby info */
+.lobby-sec-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.lobby-sec-title {
+  font-size: 1.3rem;
+  line-height: 1.2;
+  text-shadow: 0 0 18px rgba(216, 169, 58, 0.35);
+  letter-spacing: 0.06em;
+}
+
+/* ── Description ── */
+.lobby-desc {
+  font-size: 0.82rem;
+  color: var(--egypt-text-muted);
+  line-height: 1.5;
+  margin-top: -0.25rem;
+}
+
+/* ── Section footer: primary action ── */
+.lobby-sec-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+/* ── Parchment buttons: carved plaque look ── */
+.lobby-frame .parchment-btn {
+  border: 1px solid var(--egypt-gold-dark);
+  box-shadow:
+    0 5px 0 rgba(90, 50, 5, 0.85),
+    0 8px 22px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  font-size: 0.98rem;
+  letter-spacing: 0.07em;
+  padding: 0.8rem 1.4rem;
+}
+
+.lobby-frame .parchment-btn:hover:not(:disabled) {
+  box-shadow:
+    0 4px 0 rgba(90, 50, 5, 0.85),
+    0 10px 28px rgba(0, 0, 0, 0.55),
+    0 0 18px rgba(216, 169, 58, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.lobby-frame .parchment-btn:active:not(:disabled) {
+  box-shadow:
+    0 1px 0 rgba(90, 50, 5, 0.85),
+    0 3px 10px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(4px);
+}
+
+/* ── Quick Match: searching state ── */
+.lobby-searching {
+  font-size: 0.8rem;
+  color: var(--egypt-gold-bright);
+  text-align: center;
+  letter-spacing: 0.05em;
+  animation: lobby-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes lobby-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.lobby-cancel-btn {
+  border-color: rgba(239, 77, 77, 0.5) !important;
+  color: #f0a0a0 !important;
+}
+
+.lobby-cancel-btn:hover:not(:disabled) {
+  background: rgba(239, 77, 77, 0.1) !important;
+  border-color: rgba(239, 77, 77, 0.7) !important;
+}
+
+/* ── AI difficulty row ── */
+.lobby-difficulty {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.lobby-diff-btn {
+  flex: 1;
+  padding: 0.45rem 0.3rem !important;
+  font-size: 0.78rem !important;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+.lobby-diff-btn--active {
+  border-color: var(--egypt-border) !important;
+  background: rgba(216, 169, 58, 0.18) !important;
+  color: var(--egypt-gold-bright) !important;
+  box-shadow:
+    0 0 12px rgba(216, 169, 58, 0.2),
+    inset 0 0 8px rgba(216, 169, 58, 0.08) !important;
+}
+
+/* ── Private match: lobby-active state ── */
+.lobby-private-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  flex: 1;
+}
+
 .lobby-code {
   font-size: 1.8rem;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  color: var(--gold);
+  letter-spacing: 0.35em;
   text-align: center;
-  padding: 0.5rem;
-  background: var(--bg-surface);
-  border-radius: 8px;
-  border: 1px dashed var(--gold);
+  padding: 0.5rem 0.8rem;
+  background: var(--egypt-panel-deep);
+  border: 1px dashed var(--egypt-border);
+  border-radius: var(--egypt-radius-sm);
+  color: var(--egypt-text-main);
+  text-shadow: 0 0 14px rgba(216, 169, 58, 0.4);
 }
 
 .lobby-status {
-  color: var(--text-muted);
-  font-size: 0.85rem;
   text-align: center;
+  font-size: 0.8rem;
 }
 
-.invite-friends { margin-top: 0.5rem; }
-.invite-friends .small { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem; }
-.friend-invite-btn { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+.lobby-invite-label {
+  margin-bottom: 0.25rem;
+}
 
-/* Join group */
-.lobby-actions {
+.lobby-friend-invite-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.lobby-friend-invite-btn {
+  font-size: 0.78rem !important;
+  padding: 0.3rem 0.65rem !important;
+}
+
+/* ── Private match: create/join state ── */
+.lobby-private-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-}
-
-.join-group {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.join-group input {
+  gap: 0.65rem;
   flex: 1;
-  text-transform: uppercase;
 }
 
-/* Friends */
-.add-friend-group {
+.lobby-join-group {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  align-items: flex-start;
 }
 
-.add-friend-group input { flex: 1; }
+.lobby-join-group .egypt-input-wrap {
+  flex: 1;
+}
 
-.pending-requests {
-  border-top: 1px solid var(--border);
+.lobby-code-input {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.lobby-join-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Friends section ── */
+.lobby-add-friend {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.lobby-add-friend .egypt-input-wrap {
+  flex: 1;
+}
+
+.lobby-add-btn {
+  flex-shrink: 0;
+}
+
+/* Pending requests */
+.lobby-pending {
+  border-top: 1px solid var(--egypt-border-soft);
   padding-top: 0.5rem;
 }
 
-.pending-requests h4 {
-  font-size: 0.85rem;
-  color: var(--gold);
-  margin-bottom: 0.3rem;
+.lobby-pending-label {
+  margin-bottom: 0.35rem;
 }
 
-.pending-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0;
-  font-size: 0.85rem;
-}
-
-.pending-item .small {
-  padding: 0.2rem 0.5rem;
-  font-size: 0.7rem;
-}
-
-.friend-list {
-  list-style: none;
-}
-
-.friend-item {
+.lobby-pending-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.3rem 0;
-  font-size: 0.85rem;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-.friend-name {
+.lobby-pending-name {
+  font-size: 0.83rem;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -146,81 +370,189 @@
   white-space: nowrap;
 }
 
-.friend-actions {
+.lobby-pending-actions {
   display: flex;
-  gap: 0.25rem;
+  gap: 0.3rem;
   flex-shrink: 0;
 }
 
-.btn-icon {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  font-size: 0.85rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-muted);
+/* Friend list */
+.lobby-friend-list {
+  list-style: none;
+  overflow-y: auto;
+  max-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+}
+
+.lobby-friend-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--egypt-radius-sm);
+  background: rgba(7, 19, 33, 0.6);
+  border: 1px solid rgba(216, 169, 58, 0.08);
+  margin-bottom: 0.35rem;
+  transition: border-color 0.15s, background 0.15s;
 }
 
-.btn-icon:hover {
-  background: rgba(212, 175, 55, 0.15);
-  color: var(--gold);
-  border-color: var(--gold);
+.lobby-friend-item:last-child {
+  margin-bottom: 0;
 }
 
-.btn-icon-danger:hover {
-  background: rgba(229, 62, 62, 0.15);
-  color: var(--danger);
-  border-color: var(--danger);
+.lobby-friend-item:hover {
+  border-color: rgba(216, 169, 58, 0.22);
+  background: rgba(10, 26, 45, 0.8);
 }
 
-.friend-tag {
-  color: var(--text-muted);
+/* Smaller avatar medallion in friend rows */
+.lobby-friend-avatar {
+  flex-shrink: 0;
+  border: 2px solid var(--egypt-gold-muted);
+  box-shadow: 0 0 8px rgba(216, 169, 58, 0.18);
   font-size: 0.75rem;
 }
 
-.no-friends {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-style: italic;
+.lobby-friend-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
 }
 
-/* Invite banner */
-.invite-banner {
-  margin-bottom: 1rem;
-  background: rgba(212, 175, 55, 0.1);
-  border-color: var(--gold);
+.lobby-friend-name {
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.lobby-friend-btns {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+/* Gold-framed square icon buttons in friend rows */
+.lobby-friend-btns .egypt-icon-btn {
+  border-color: rgba(216, 169, 58, 0.3);
+  background: rgba(3, 10, 20, 0.7);
+  border-radius: 5px;
+}
+
+.lobby-no-friends {
   text-align: center;
+  margin: auto 0;
+  padding: 1.5rem 0;
+  font-style: italic;
+  font-size: 0.82rem;
 }
 
-.invite-actions {
+/* ── Invite banner ── */
+.lobby-invite-banner {
+  position: fixed;
+  top: 5rem;
+  right: 1.5rem;
+  z-index: 200;
+  width: 310px;
+}
+
+.lobby-invite-panel {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.lobby-invite-text {
+  font-size: 0.88rem;
+}
+
+.lobby-invite-text .egypt-display {
+  font-size: 0.98rem;
+}
+
+.lobby-invite-actions {
   display: flex;
   gap: 0.5rem;
   justify-content: center;
-  margin-top: 0.5rem;
 }
 
-/* Error toast */
-.error-toast {
-  background: rgba(192, 57, 43, 0.9);
-  color: white;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  text-align: center;
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
-  animation: fadeInUp 0.3s ease;
+/* ── Error toast ── */
+.lobby-error-toast {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  background: rgba(130, 20, 20, 0.94);
+  border: 1px solid rgba(239, 77, 77, 0.55);
+  color: #f9c7c7;
+  padding: 0.6rem 1.4rem;
+  border-radius: var(--egypt-radius-sm);
+  font-size: 0.875rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  animation: lobby-toast-in 0.25s ease;
+  white-space: nowrap;
 }
 
-.connection-status {
+@keyframes lobby-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Connection status ── */
+.lobby-connection-status {
   text-align: center;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  margin-top: 1rem;
+  font-size: 0.78rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 740px) {
+  .lobby-compartments {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-compartment {
+    min-height: auto;
+    padding: 1.25rem;
+  }
+
+  .lobby-friend-list {
+    max-height: 260px;
+  }
+
+  .lobby-invite-banner {
+    width: calc(100vw - 2rem);
+    right: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .lobby-view {
+    padding: 0.75rem;
+  }
+
+  .lobby-compartment {
+    padding: 1rem;
+  }
+
+  .lobby-difficulty {
+    flex-direction: column;
+  }
+
+  .lobby-diff-btn {
+    flex: none;
+  }
+
+  .lobby-sec-title {
+    font-size: 1.1rem;
+  }
 }
