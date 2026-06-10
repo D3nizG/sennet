@@ -1,10 +1,40 @@
 import React, { useRef, useEffect } from 'react';
-import type { MoveLogEntry } from '@sennet/game-engine';
+import type { MoveLogEntry, Move } from '@sennet/game-engine';
 import { EgyptianPanel, EgyptianTabs, EgyptianButton } from '../EgyptianTheme';
 import { BEAR_OFF_POSITION } from '@sennet/game-engine';
 import './BottomGamePanel.css';
 
 type PanelTab = 'log' | 'chat' | 'help';
+
+// ── Move-log humanisation ────────────────────────────────────────────────────
+// Engine positions are 0-based; the board (and these labels) are 1-based.
+// Bearing off lands on BEAR_OFF_POSITION (30), shown as "home".
+
+/** Describe a completed move in board (1-based) coordinates. */
+function describeMove(move: Move): string {
+  const from = move.from + 1;
+  if (move.to === BEAR_OFF_POSITION) return `${from} → home`;
+  return `${from} → ${move.to + 1}`;
+}
+
+/** Describe a turn with no move (rolled a 6, or blocked). */
+function describeNoMove(event?: string): string {
+  if (event === 'rolled_6') return 'rolled a 6 — rolls again';
+  if (event === 'blocked') return 'no legal move — turn skipped';
+  return 'no move';
+}
+
+/** Friendly tag for a notable move outcome, or null if unremarkable. */
+function moveEventLabel(event?: string): string | null {
+  switch (event) {
+    case 'capture':         return 'Capture!';
+    case 'bear_off':        return 'Borne off';
+    case 'house_of_netting':return 'Trapped — turn ends';
+    case 'waters_of_chaos': return 'Washed back to 14';
+    default:
+      return event?.startsWith('bonus_square_') ? 'Extra roll' : null;
+  }
+}
 
 interface ChatMessage {
   senderId: string;
@@ -76,21 +106,24 @@ export function BottomGamePanel({
       <div className="bottom-panel-body egypt-scrollbar">
         {activeTab === 'log' && (
           <div className="panel-move-log egypt-scrollbar" role="tabpanel">
-            {[...moveLog].reverse().slice(0, 30).map((entry, i) => (
-              <div key={i} className="log-entry">
-                <span className="log-turn">T{entry.turnNumber}</span>
-                <span className={`log-player ${entry.player}`}>
-                  {entry.player === yourPlayerId ? 'You' : 'Opp'}
-                </span>
-                <span className="log-roll">🎲{entry.rollValue}</span>
-                <span className="log-action">
-                  {entry.move != null
-                    ? `${entry.move.from}→${entry.move.to === BEAR_OFF_POSITION ? 'OFF' : entry.move.to}`
-                    : entry.event ?? 'skip'}
-                </span>
-                {entry.event && <span className="log-event">{entry.event}</span>}
-              </div>
-            ))}
+            {[...moveLog].reverse().slice(0, 30).map((entry, i) => {
+              const tag = entry.move != null ? moveEventLabel(entry.event) : null;
+              return (
+                <div key={i} className="log-entry">
+                  <span className="log-turn">T{entry.turnNumber}</span>
+                  <span className={`log-player ${entry.player}`}>
+                    {entry.player === yourPlayerId ? 'You' : 'Opp'}
+                  </span>
+                  <span className="log-roll">🎲{entry.rollValue}</span>
+                  <span className="log-action">
+                    {entry.move != null
+                      ? describeMove(entry.move)
+                      : describeNoMove(entry.event)}
+                  </span>
+                  {tag && <span className="log-event">{tag}</span>}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -140,33 +173,24 @@ export function BottomGamePanel({
           <div className="panel-help" role="tabpanel">
             <div className="help-grid">
               <div className="help-row">
-                <span className="sq-sample sq-sample--plain">0</span>
-                <span className="help-text egypt-muted">Rebirth — pieces return here from Waters of Chaos</span>
-              </div>
-              <div className="help-row">
-                <span className="sq-sample sq-sample--danger">13</span>
+                <span className="sq-sample sq-sample--danger">14</span>
                 <span className="help-text egypt-muted">House of Netting — trap! Turn ends immediately</span>
               </div>
               <div className="help-row">
-                <span className="sq-sample sq-sample--bonus">14</span>
-                <span className="help-text egypt-muted">House of Happiness — gain +1 extra roll (𓋹)</span>
+                <span className="sq-sample sq-sample--bonus">15</span>
+                <span className="help-text egypt-muted">House of Happiness — gain +1 extra roll</span>
               </div>
               <div className="help-row">
-                <span className="sq-sample sq-sample--bonus">25</span>
-                <span className="help-text egypt-muted">House of Water — gain +1 extra roll (not safe)</span>
+                <span className="sq-sample sq-sample--bonus">26</span>
+                <span className="help-text egypt-muted">House of Rebirth — gain +1 extra roll</span>
               </div>
               <div className="help-row">
-                <span className="sq-sample sq-sample--danger">26</span>
-                <span className="help-text egypt-muted">Waters of Chaos — piece washed back to sq 13</span>
+                <span className="sq-sample sq-sample--chaos">27</span>
+                <span className="help-text egypt-muted">Waters of Chaos — piece washed back to square 14</span>
               </div>
               <div className="help-row">
-                <span className="sq-sample sq-sample--safe">27–29</span>
+                <span className="sq-sample sq-sample--safe">28–30</span>
                 <span className="help-text egypt-muted">Safe squares — cannot be captured</span>
-              </div>
-              <div className="help-row">
-                <span className="help-tip egypt-muted">
-                  Roll a 1 in the faceoff to go first. Roll 6 to get an extra turn.
-                </span>
               </div>
             </div>
           </div>

@@ -1,181 +1,251 @@
-/* ── Senet Board Shell ─────────────────────────────────────────────────────── */
+/* ── Royal Sennet Board ──────────────────────────────────────────────────────
+   Fully responsive DOM/CSS grid — no image, no coordinate overlays.
+   Three rows of ten real cells following the serpentine 1-30 path.            */
 
-.senet-board-shell {
-  position: relative;
-  width: min(860px, 90vw);
-  /* aspect-ratio is set inline from BOARD_ASPECT_RATIO */
+.sennet-board--royal {
+  --cell-radius: clamp(4px, 0.7vw, 9px);
+
+  position: relative; /* anchors the inset frame (::before) */
+  /* Fill the available width up to the cap (centred by the board section) so
+     the board never overflows the section padding on narrow screens. */
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: clamp(10px, 1.5vw, 22px) clamp(24px, 3vw, 38px);
+
+  border: 2px solid rgba(230, 190, 95, 0.8);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at center, rgba(230, 190, 95, 0.12), transparent 65%),
+    linear-gradient(180deg, #07111f, #030812);
+  box-shadow:
+    0 0 34px rgba(230, 190, 95, 0.18),
+    inset 0 0 22px rgba(230, 190, 95, 0.1);
   user-select: none;
-  overflow: hidden;
 }
 
-/* ── Board Art ─────────────────────────────────────────────────────────────── */
-
-.senet-board-art {
+/* Inset hairline frame — makes the board feel like a crafted artifact. */
+.sennet-board--royal::before {
+  content: '';
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: fill; /* fill exactly so hitboxes stay aligned */
-  display: block;
+  inset: 7px;
+  border: 1px solid rgba(230, 190, 95, 0.35);
+  border-radius: 16px;
   pointer-events: none;
 }
 
-/* ── Hitbox Layer ──────────────────────────────────────────────────────────── */
+/* ── Grid: three rows stacked, with stronger separation between rows ──────── */
 
-.senet-board-hitboxes {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.sennet-board-grid {
+  display: flex;
+  flex-direction: column;
+  /* Vertical row gap is deliberately larger than the in-row cell gap: rows are
+     path-adjacent (10↔11, 20↔21) but never protective neighbours. */
+  gap: clamp(10px, 1.15vw, 16px);
 }
 
-.senet-cell-hitbox {
+.sennet-board-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: clamp(3px, 0.45vw, 6px);
+  aspect-ratio: 10 / 1; /* keeps every cell close to square at any width */
+}
+
+/* ── Turn-aware path markers (sit in the side padding, never in the grid) ─── */
+
+.sennet-board-turn {
   position: absolute;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: default;
-  padding: 0;
-  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: clamp(0.78rem, 1.8vw, 1.15rem);
+  line-height: 1;
+  color: var(--egypt-gold-muted, rgba(230, 190, 95, 0.66));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sennet-board-turn--right {
+  right: clamp(-30px, -2.4vw, -18px);
+}
+
+.sennet-board-turn--left {
+  left: clamp(-30px, -2.4vw, -18px);
+}
+
+/* Mirror the ⤵ glyph into a curved "left → down" turn (keeps translateY centring). */
+.sennet-board-turn.sennet-board-turn--flip-x {
+  transform: translateY(-50%) scaleX(-1);
+}
+
+/* ── Cell ────────────────────────────────────────────────────────────────── */
+
+.sennet-board-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border-radius: var(--cell-radius);
+  border: 1px solid rgba(230, 190, 95, 0.55);
+  background: linear-gradient(150deg, rgba(18, 38, 62, 0.95), rgba(7, 17, 30, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 245, 190, 0.28),
+    inset 0 -2px 7px rgba(0, 0, 0, 0.28),
+    0 1px 3px rgba(0, 0, 0, 0.25);
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
   outline: none;
 }
 
-/* Legal move target — gold-green glow */
-.senet-cell-hitbox.is-highlighted {
-  background: rgba(56, 210, 122, 0.25);
-  box-shadow: inset 0 0 0 2px rgba(56, 210, 122, 0.8);
-  cursor: pointer;
-}
-
-.senet-cell-hitbox.is-highlighted:hover {
-  background: rgba(56, 210, 122, 0.4);
-}
-
-/* Selectable (has movable piece) */
-.senet-cell-hitbox.is-selectable {
-  cursor: pointer;
-}
-
-/* ── Pieces Layer ──────────────────────────────────────────────────────────── */
-
-.senet-board-pieces {
+.sennet-board-cell-number {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: clamp(1px, 0.4vw, 4px);
+  left: clamp(2px, 0.5vw, 5px);
+  z-index: 1;
+  font-size: clamp(0.5rem, 1.3vw, 0.85rem);
+  font-weight: 600;
+  line-height: 1;
+  color: rgba(246, 217, 138, 0.55);
   pointer-events: none;
 }
 
-.senet-piece {
+/* Special-square glyph — centred, faint, sits behind any piece. */
+.sennet-board-cell-symbol {
   position: absolute;
-  transform: translate(-50%, -50%);
-  width: min(44px, 5.5%);
-  height: min(44px, 5.5%);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 0;
+  font-size: clamp(0.95rem, 2vw, 1.7rem);
+  line-height: 1;
+  color: rgba(255, 244, 214, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.sennet-board-cell--occupied .sennet-board-cell-symbol {
+  opacity: 0.2;
+}
+
+/* ── Special squares ─────────────────────────────────────────────────────── */
+
+.sennet-board-cell--netting {
+  background: linear-gradient(150deg, #b44a3f, #4a1515);
+  border-color: rgba(230, 130, 110, 0.7);
+}
+
+.sennet-board-cell--happiness,
+.sennet-board-cell--rebirth {
+  background: radial-gradient(circle at 50% 40%, #ffd76a, #9a6a1e);
+  border-color: rgba(255, 224, 130, 0.85);
+}
+
+.sennet-board-cell--chaos {
+  background: radial-gradient(circle at 50% 40%, #2c8dcc, #06243d);
+  border-color: rgba(120, 200, 245, 0.75);
+}
+
+.sennet-board-cell--safe {
+  background: linear-gradient(150deg, #5f8f5e, #16381f);
+  border-color: rgba(150, 215, 150, 0.7);
+}
+
+/* Special-cell numbers need a touch more contrast against warm backgrounds. */
+.sennet-board-cell--netting .sennet-board-cell-number,
+.sennet-board-cell--happiness .sennet-board-cell-number,
+.sennet-board-cell--rebirth .sennet-board-cell-number,
+.sennet-board-cell--chaos .sennet-board-cell-number,
+.sennet-board-cell--safe .sennet-board-cell-number {
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Interactive states ──────────────────────────────────────────────────── */
+
+/* Legal move target — green glow. */
+.sennet-board-cell.is-highlighted {
+  cursor: pointer;
+  border-color: rgba(56, 210, 122, 0.9);
+  box-shadow:
+    inset 0 0 0 2px rgba(56, 210, 122, 0.8),
+    0 0 12px rgba(56, 210, 122, 0.35);
+}
+
+.sennet-board-cell.is-highlighted:hover {
+  box-shadow:
+    inset 0 0 0 2px rgba(56, 210, 122, 1),
+    0 0 18px rgba(56, 210, 122, 0.55);
+}
+
+/* Cell holds a selectable piece. */
+.sennet-board-cell.is-selectable {
+  cursor: pointer;
+}
+
+/* Subtle lift on interactive cells — kept minimal so the board never feels jumpy. */
+@media (hover: hover) {
+  .sennet-board-cell.is-selectable:hover,
+  .sennet-board-cell.is-highlighted:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* ── Pieces ──────────────────────────────────────────────────────────────── */
+
+.sennet-piece {
+  width: clamp(16px, 4.4vw, 38px);
+  height: clamp(16px, 4.4vw, 38px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   border-radius: 50%;
   background: var(--piece-color, #d8a93a);
   border: 2px solid rgba(255, 255, 255, 0.35);
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.5),
-    inset 0 1px 3px rgba(255, 255, 255, 0.3);
+    0 3px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: default;
-  pointer-events: auto;
-
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  cursor: inherit;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
   z-index: 2;
 }
 
-.senet-piece__symbol {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(9px, 1.4%, 14px);
+.sennet-piece__symbol {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(8px, 2vw, 14px);
+  line-height: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   pointer-events: none;
-  line-height: 1;
 }
 
-.senet-piece--selectable {
-  cursor: pointer;
+.sennet-piece--selectable {
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 3px 8px rgba(0, 0, 0, 0.35),
     0 0 10px rgba(216, 169, 58, 0.5),
-    inset 0 1px 3px rgba(255, 255, 255, 0.3);
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
-.senet-piece--selectable:hover {
-  transform: translate(-50%, -50%) scale(1.15);
+.sennet-board-cell.is-selectable:hover .sennet-piece--selectable {
+  transform: scale(1.12);
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.5),
     0 0 18px rgba(216, 169, 58, 0.7),
-    inset 0 1px 3px rgba(255, 255, 255, 0.3);
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
-.senet-piece--selected {
-  transform: translate(-50%, -50%) scale(1.18);
+.sennet-piece--selected {
+  transform: scale(1.15);
   box-shadow:
-    0 0 0 3px var(--egypt-gold),
+    0 0 0 3px var(--egypt-gold, #d8a93a),
     0 4px 14px rgba(0, 0, 0, 0.55),
     0 0 20px rgba(216, 169, 58, 0.65),
-    inset 0 1px 3px rgba(255, 255, 255, 0.3);
-}
-
-/* ── Debug Overlay ─────────────────────────────────────────────────────────── */
-
-.senet-board-debug {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 99;
-}
-
-.senet-calibration-prompt {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(10, 15, 30, 0.88);
-  border: 1px solid rgba(216, 169, 58, 0.5);
-  border-radius: 6px;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.72rem;
-  color: #d8a93a;
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 100;
-}
-
-.senet-calibration-prompt strong {
-  color: #fff;
-}
-
-.senet-calibration-count {
-  margin-left: 0.4rem;
-  opacity: 0.6;
-}
-
-.senet-calibration-prompt--done {
-  color: #38d27a;
-  border-color: rgba(56, 210, 122, 0.5);
-}
-
-.senet-debug-dot {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgba(255, 0, 0, 0.75);
-  border: 1px solid white;
-  font-size: 7px;
-  font-weight: 700;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }

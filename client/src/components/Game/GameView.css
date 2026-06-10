@@ -10,6 +10,27 @@
   flex-direction: column;
 }
 
+/* Slightly blur the background scene on the game page to calm it behind the
+   board. Sits in the shell's z-index:0 band (with the overlay/vignette) so it
+   blurs the background image but not the game UI, which renders at z-index 1. */
+.game-shell::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Fallback for browsers without backdrop-filter (e.g. older Firefox): can't
+   blur, so dim the background scene instead to keep the board the focus. */
+@supports not ((backdrop-filter: blur(5px)) or (-webkit-backdrop-filter: blur(5px))) {
+  .game-shell::after {
+    background: rgba(4, 10, 20, 0.45);
+  }
+}
+
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 
 .game-layout {
@@ -124,6 +145,7 @@
   padding: 0.5rem 1rem;
   overflow: hidden;
 }
+
 
 /* ── Faceoff area ───────────────────────────────────────────────────────── */
 

@@ -171,13 +171,6 @@
   line-height: 1.3;
 }
 
-.help-tip {
-  font-size: 0.72rem;
-  font-style: italic;
-  padding-left: 0.25rem;
-  line-height: 1.4;
-}
-
 /* Square samples */
 .sq-sample {
   display: inline-flex;
@@ -196,4 +189,5 @@
 .sq-sample--plain   { background: rgba(168,178,193,0.15); color: var(--egypt-text-muted); border: 1px solid rgba(168,178,193,0.3); }
 .sq-sample--danger  { background: #FFCDD2; color: #B71C1C; }
 .sq-sample--bonus   { background: #FFE082; color: #E65100; }
+.sq-sample--chaos   { background: #B3E5FC; color: #01579B; }
 .sq-sample--safe    { background: #C8E6C9; color: #1B5E20; }
