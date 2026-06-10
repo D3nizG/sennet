@@ -62,6 +62,7 @@ client/dist/
 /reference_images/
 
 # ─── Misc ─────────────────────────────────────────────────────────────────────
+.claude/
 .cache/
 .parcel-cache/
 .turbo/
