@@ -125,6 +125,36 @@
   overflow: hidden;
 }
 
+/* Soft radial focus behind the board — pulls attention without blurring the
+   page background. The board itself sits above it (z-index in Board.css). */
+.game-board-focus {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  /* Slightly wider than the board cap so the vignette hugs the board on desktop
+     while the board fills the available width (minus section padding) on mobile. */
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.game-board-focus::before {
+  content: '';
+  position: absolute;
+  inset: -80px -120px;
+  border-radius: 999px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(3, 8, 18, 0.72) 0%,
+    rgba(3, 8, 18, 0.45) 38%,
+    rgba(3, 8, 18, 0.12) 68%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* ── Faceoff area ───────────────────────────────────────────────────────── */
 
 .game-faceoff-area {

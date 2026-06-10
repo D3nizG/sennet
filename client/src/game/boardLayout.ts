@@ -23,27 +23,47 @@ export const BOARD_DISPLAY_ROWS = [
 /** Flat list of all 30 engine positions in display order. */
 export const BOARD_DISPLAY_CELLS = BOARD_DISPLAY_ROWS.flat();
 
-/** Travel direction of each row, used for the path-direction arrows. */
-export const BOARD_ROW_DIRECTIONS = ['right', 'left', 'right'] as const;
-export type RowDirection = (typeof BOARD_ROW_DIRECTIONS)[number];
-
 export type SpecialKind = 'netting' | 'happiness' | 'rebirth' | 'chaos' | 'safe';
 
 export interface CellMeta {
   kind: SpecialKind;
   label: string;
+  /** Decorative glyph rendered (faint) behind any piece on the square. */
+  symbol: string;
 }
 
 // Keyed by ENGINE position. Display numbers shown in comments for reference.
+// Symbols are intentionally font glyphs (no image assets): ☥ ankh = bonus,
+// ⊗ = net/trap, ≋ = water/current, 𓂀 Eye of Horus = safe.
 export const BOARD_CELL_META: Record<number, CellMeta> = {
-  13: { kind: 'netting', label: 'House of Netting' }, // display 14 — trap, ends turn
-  14: { kind: 'happiness', label: 'House of Happiness' }, // display 15 — bonus roll
-  25: { kind: 'rebirth', label: 'House of Rebirth' }, // display 26 — bonus roll
-  26: { kind: 'chaos', label: 'Waters of Chaos' }, // display 27 — wash back to 14
-  27: { kind: 'safe', label: 'Safe Square' }, // display 28
-  28: { kind: 'safe', label: 'Safe Square' }, // display 29
-  29: { kind: 'safe', label: 'Safe Square' }, // display 30
+  13: { kind: 'netting', label: 'House of Netting', symbol: '⊗' }, // display 14 — trap, ends turn
+  14: { kind: 'happiness', label: 'House of Happiness', symbol: '☥' }, // display 15 — bonus roll
+  25: { kind: 'rebirth', label: 'House of Rebirth', symbol: '☥' }, // display 26 — bonus roll
+  26: { kind: 'chaos', label: 'Waters of Chaos', symbol: '≋' }, // display 27 — wash back to 14
+  27: { kind: 'safe', label: 'Safe Square', symbol: '𓂀' }, // display 28
+  28: { kind: 'safe', label: 'Safe Square', symbol: '𓂀' }, // display 29
+  29: { kind: 'safe', label: 'Safe Square', symbol: '𓂀' }, // display 30
 };
+
+/**
+ * Turn-aware path indicators, keyed by display row index. They sit just outside
+ * the row ends (in the board's side padding) to teach the serpentine path:
+ *   row 1 → turns down to 11, row 2 ← then turns down to 21, row 3 →.
+ */
+export interface RowTurnMarker {
+  side: 'left' | 'right';
+  glyph: string;
+  label: string;
+}
+
+export const BOARD_ROW_TURN_MARKERS: RowTurnMarker[][] = [
+  [{ side: 'right', glyph: '⤵', label: 'Path turns down toward square 11' }],
+  [
+    { side: 'right', glyph: '←', label: 'Row runs right to left (11 → 20)' },
+    { side: 'left', glyph: '⤶', label: 'Path turns down toward square 21' },
+  ],
+  [{ side: 'left', glyph: '→', label: 'Row runs left to right (21 → 30)' }],
+];
 
 /** Convert an engine position (0-29) to its displayed number (1-30). */
 export function engineToDisplayPosition(position: number): number {

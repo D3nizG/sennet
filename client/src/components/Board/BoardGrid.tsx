@@ -1,5 +1,5 @@
 import type { PieceState, PlayerId } from '@sennet/game-engine';
-import { BOARD_DISPLAY_ROWS, BOARD_ROW_DIRECTIONS } from '../../game/boardLayout';
+import { BOARD_DISPLAY_ROWS, BOARD_ROW_TURN_MARKERS } from '../../game/boardLayout';
 import { BoardCell } from './BoardCell';
 
 interface BoardGridProps {
@@ -18,8 +18,8 @@ interface BoardGridProps {
 }
 
 /**
- * Renders the 30 board squares as three CSS-grid rows. Each row carries its own
- * path-direction arrow so the serpentine flow reads without instructions.
+ * Renders the 30 board squares as three CSS-grid rows. Each row carries
+ * turn-aware path markers so the serpentine flow reads without instructions.
  */
 export function BoardGrid({
   boardMap,
@@ -35,11 +35,7 @@ export function BoardGrid({
   return (
     <div className="sennet-board-grid">
       {BOARD_DISPLAY_ROWS.map((row, rowIndex) => (
-        <div
-          key={rowIndex}
-          className={`sennet-board-row sennet-board-row--${BOARD_ROW_DIRECTIONS[rowIndex]}`}
-          data-row={rowIndex}
-        >
+        <div key={rowIndex} className="sennet-board-row" data-row={rowIndex}>
           {row.map((position) => {
             const piece = boardMap.get(position) ?? null;
             const isSelectablePiece =
@@ -64,6 +60,17 @@ export function BoardGrid({
               />
             );
           })}
+
+          {BOARD_ROW_TURN_MARKERS[rowIndex].map((marker) => (
+            <span
+              key={marker.side}
+              className={`sennet-board-turn sennet-board-turn--${marker.side}`}
+              aria-hidden="true"
+              title={marker.label}
+            >
+              {marker.glyph}
+            </span>
+          ))}
         </div>
       ))}
     </div>

@@ -40,6 +40,7 @@ export function BoardCell({
       className={[
         'sennet-board-cell',
         meta && `sennet-board-cell--${meta.kind}`,
+        piece && 'sennet-board-cell--occupied',
         isHighlighted && 'is-highlighted',
         isSelectablePiece && 'is-selectable',
         isSelected && 'is-selected',
@@ -63,6 +64,11 @@ export function BoardCell({
       }
     >
       <span className="sennet-board-cell-number">{displayNumber}</span>
+      {meta && (
+        <span className="sennet-board-cell-symbol" aria-hidden="true">
+          {meta.symbol}
+        </span>
+      )}
       {piece && pieceColor && (
         <BoardPiece
           piece={piece}
