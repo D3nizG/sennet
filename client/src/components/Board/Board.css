@@ -5,12 +5,11 @@
 .sennet-board--royal {
   --cell-radius: clamp(4px, 0.7vw, 9px);
 
-  position: relative;
-  z-index: 1; /* sit above the board-focus vignette */
-  /* Fill the available width (set by .game-board-focus) up to the cap, so the
-     board never overflows the section padding on narrow screens. */
+  position: relative; /* anchors the inset frame (::before) */
+  /* Fill the available width up to the cap (centred by the board section) so
+     the board never overflows the section padding on narrow screens. */
   width: 100%;
-  max-width: 920px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: clamp(10px, 1.5vw, 22px) clamp(24px, 3vw, 38px);
 

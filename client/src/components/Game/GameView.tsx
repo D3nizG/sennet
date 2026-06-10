@@ -349,18 +349,16 @@ export function GameView() {
         {!showFaceoff && (
           <div className="game-center-col">
             <div className="game-board-section">
-              <div className="game-board-focus">
-                <Board
-                  gameState={gameState}
-                  yourPlayer={yourPlayer}
-                  opponentColor={opponentColor || '#8B4513'}
-                  yourColor={myColor}
-                  legalMoves={canMove ? legalMoves : []}
-                  selectedPiece={selectedPiece}
-                  onSelectPiece={handleSelectPiece}
-                  onSelectSquare={handleSelectSquare}
-                />
-              </div>
+              <Board
+                gameState={gameState}
+                yourPlayer={yourPlayer}
+                opponentColor={opponentColor || '#8B4513'}
+                yourColor={myColor}
+                legalMoves={canMove ? legalMoves : []}
+                selectedPiece={selectedPiece}
+                onSelectPiece={handleSelectPiece}
+                onSelectSquare={handleSelectSquare}
+              />
             </div>
 
             <GameActionArea

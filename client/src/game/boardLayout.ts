@@ -56,13 +56,16 @@ export interface RowTurnMarker {
   label: string;
 }
 
+// Each glyph reads as arrival → departure at that corner, so all four turns
+// share one bent-arrow language:
+//   10: right → down   11: down → left   20: left → down   21: down → right
 export const BOARD_ROW_TURN_MARKERS: RowTurnMarker[][] = [
-  [{ side: 'right', glyph: '⤵', label: 'Path turns down toward square 11' }],
+  [{ side: 'right', glyph: '⤵', label: 'Path arrives along row 1, then turns down to square 11' }],
   [
-    { side: 'right', glyph: '←', label: 'Row runs right to left (11 → 20)' },
-    { side: 'left', glyph: '⤶', label: 'Path turns down toward square 21' },
+    { side: 'right', glyph: '⤶', label: 'Path arrives down from 10, then runs left to 20' },
+    { side: 'left', glyph: '⬐', label: 'Path arrives along row 2, then turns down to square 21' },
   ],
-  [{ side: 'left', glyph: '→', label: 'Row runs left to right (21 → 30)' }],
+  [{ side: 'left', glyph: '⤷', label: 'Path arrives down from 20, then runs right to 30' }],
 ];
 
 /** Convert an engine position (0-29) to its displayed number (1-30). */
