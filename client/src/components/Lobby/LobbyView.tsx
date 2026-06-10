@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
@@ -21,7 +21,6 @@ import './LobbyView.css';
 
 export function LobbyView() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { socket, connected } = useSocket();
   const { inGame } = useGame();
   const { user } = useAuth();
@@ -54,19 +53,9 @@ export function LobbyView() {
   useEffect(() => {
     if (inGame && !hasNavigated.current) {
       hasNavigated.current = true;
-      console.log('[LobbyView] inGame=true → navigating to /game'); // TODO: remove
       navigate('/game');
     }
   }, [inGame, navigate]);
-
-  useEffect(() => {
-    const state = location.state as { autoQueue?: boolean } | null;
-    if (state?.autoQueue && connected && socket) {
-      socket.emit('QUEUE_JOIN');
-      setQueuing(true);
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, connected, socket, navigate, location.pathname]);
 
   useEffect(() => {
     void loadFriends();

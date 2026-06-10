@@ -16,7 +16,6 @@ export function getSocket(): TypedSocket {
 
   // If socket exists but token changed, tear down old socket
   if (socket && token !== currentToken) {
-    console.log('[socket] Token changed, disconnecting stale socket'); // TODO: remove
     socket.disconnect();
     socket = null;
   }

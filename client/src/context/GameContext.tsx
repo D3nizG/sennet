@@ -98,7 +98,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!socket) return;
 
     const onQueueMatched = (data: QueueMatchedPayload) => {
-      console.log('[GameProvider] QUEUE_MATCHED received', data.gameId); // TODO: remove
       // Start every match from a clean slate so a previous game's gameOver,
       // initialRolls, faceoff or board state can't bleed into the new one.
       setGame({
@@ -113,7 +112,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onGameState = (data: GameStatePayload) => {
-      console.log('[GameProvider] GAME_STATE received, phase:', data.gameState.phase, 'turnPhase:', data.gameState.turnPhase, 'rollDeadlineAt:', data.rollDeadlineAt, 'faceoffRound:', data.faceoffRound);
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
@@ -137,7 +135,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onRollResult = (data: GameRollResultPayload) => {
-      console.log('[GameProvider] GAME_ROLL_RESULT value:', data.value, 'moves:', data.legalMoves.length, 'event:', data.event); // TODO: remove
       setGame(prev => ({
         ...prev,
         lastRoll: data.value,
@@ -147,7 +144,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onMoveApplied = (data: GameMoveAppliedPayload) => {
-      console.log('[GameProvider] GAME_MOVE_APPLIED event:', data.event, 'nextPlayer:', data.gameState.currentPlayer);
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
@@ -240,7 +236,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const requestRejoin = useCallback(() => {
     if (!socket?.connected || rejoinRequested.current) return;
     rejoinRequested.current = true;
-    console.log('[GameProvider] Emitting GAME_REJOIN'); // TODO: remove
     socket.emit('GAME_REJOIN');
   }, [socket]);
 

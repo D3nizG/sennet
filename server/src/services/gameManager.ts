@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import {
   GameState, PlayerId, Move,
-  initGame, performInitialRoll, applyRoll, applyMove,
+  initGame, applyRoll, applyMove,
   getLegalMoves, BEAR_OFF_POSITION,
 } from '@sennet/game-engine';
 import { secureRoll } from '../utils/rng.js';
@@ -115,27 +115,6 @@ export class GameManager {
     if (game.players.player1.userId === userId) return 'player1';
     if (game.players.player2.userId === userId) return 'player2';
     return null;
-  }
-
-  /** Process the initial roll ceremony (both players roll simultaneously). */
-  doInitialRoll(game: ActiveGame): {
-    state: GameState;
-    p1Roll: number;
-    p2Roll: number;
-    decided: boolean;
-    firstPlayer: PlayerId | null;
-  } {
-    const p1Roll = secureRoll();
-    const p2Roll = secureRoll();
-    game.state = performInitialRoll(game.state, p1Roll, p2Roll);
-
-    return {
-      state: game.state,
-      p1Roll,
-      p2Roll,
-      decided: game.state.initialRolls.decided,
-      firstPlayer: game.state.initialRolls.firstPlayer,
-    };
   }
 
   /** Player rolls the dice. Server generates the value. */

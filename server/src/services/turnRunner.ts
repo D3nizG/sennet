@@ -239,21 +239,6 @@ export class TurnRunner {
     return ok();
   }
 
-  /**
-   * Called after faceoff decides first player (or for AI after auto-faceoff).
-   * Sends initial GAME_STATE and kicks off the first turn.
-   */
-  onGameReady(gameId: string): void {
-    const game = this.gameManager.get(gameId);
-    if (!game || game.state.phase !== 'playing') return;
-
-    logger.info({ gameId, firstPlayer: game.state.currentPlayer, isAiGame: game.isAiGame }, '[TurnRunner] Game ready');
-    this.emitStateToAll(game);
-
-    // Start the first turn — afterAction handles roll timer or AI
-    this.afterAction(gameId);
-  }
-
   /** Cleanup all timers / AI loops for a game. */
   cleanupGame(gameId: string): void {
     this.clearRollTimer(gameId);
