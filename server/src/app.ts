@@ -12,6 +12,12 @@ import { apiLimiter } from './middleware/rateLimit.js';
 export function createApp(prisma: PrismaClient) {
   const app = express();
 
+  // Running behind Railway's proxy: trust the first hop so the real client IP
+  // is read from X-Forwarded-For. Without this, express-rate-limit throws
+  // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request (including /health),
+  // which crash-loops the server in production.
+  app.set('trust proxy', 1);
+
   // Security
   app.use(helmet());
   app.use(cors({ origin: config.clientUrl, credentials: true }));
