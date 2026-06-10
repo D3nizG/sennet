@@ -44,6 +44,17 @@ export function connectSocket(): TypedSocket {
   return s;
 }
 
+/**
+ * Tell the server the user is signing out so it can end any active game,
+ * lobby, or queue immediately (no disconnect grace period). Must be called
+ * while the socket is still connected — before disconnectSocket().
+ */
+export function emitLogout(): void {
+  if (socket && socket.connected) {
+    socket.emit('LOGOUT');
+  }
+}
+
 export function disconnectSocket(): void {
   if (socket) {
     socket.disconnect();

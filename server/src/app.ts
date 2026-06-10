@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { config } from './config.js';
 import { authRouter } from './routes/auth.js';
 import { profileRouter } from './routes/profile.js';
+import { usersRouter } from './routes/users.js';
 import { friendsRouter } from './routes/friends.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 
@@ -23,6 +24,7 @@ export function createApp(prisma: PrismaClient) {
   // Routes
   app.use('/api/auth', authRouter(prisma));
   app.use('/api/profile', profileRouter(prisma));
+  app.use('/api/users', usersRouter(prisma));
   app.use('/api/friends', friendsRouter(prisma));
 
   return app;

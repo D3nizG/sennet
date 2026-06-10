@@ -18,12 +18,14 @@ import {
 } from '@sennet/game-engine';
 import { secureRoll } from '../utils/rng.js';
 import { logger } from '../utils/logger.js';
+import type { RematchManager } from './rematchManager.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ROLL_TIMEOUT_MS = 5_000;           // 5 s to click Roll
 const MOVE_TIMEOUT_MS = 13_000;          // 13 s to select a move
 const AI_STEP_DELAY_MS = 650;            // delay between AI roll and move
+const FACEOFF_RESULT_PAUSE_MS = 1_500;   // pause on the faceoff result before game / next round
 
 // ─── Return type ─────────────────────────────────────────────────────────────
 
@@ -49,7 +51,18 @@ export class TurnRunner {
     private gameManager: GameManager,
     /** Override for testing — allows shorter deadlines and AI delays. */
     private opts: { rollTimeoutMs?: number; moveTimeoutMs?: number; aiDelayMs?: number } = {},
+    private rematchManager?: RematchManager,
   ) {}
+
+  /** Make a finished PvP game eligible for a rematch (both players can Play Again). */
+  private registerRematch(game: ActiveGame): void {
+    if (!this.rematchManager || game.isAiGame) return;
+    this.rematchManager.register(
+      game.gameId,
+      { userId: game.players.player1.userId, displayName: game.players.player1.displayName, houseColor: game.players.player1.houseColor },
+      { userId: game.players.player2.userId, displayName: game.players.player2.displayName, houseColor: game.players.player2.houseColor },
+    );
+  }
 
   private get rollTimeout(): number { return this.opts.rollTimeoutMs ?? ROLL_TIMEOUT_MS; }
   private get moveTimeout(): number { return this.opts.moveTimeoutMs ?? MOVE_TIMEOUT_MS; }
@@ -60,19 +73,15 @@ export class TurnRunner {
   // ── Faceoff ────────────────────────────────────────────────────────────────
 
   /**
-   * Called after game is created. For multiplayer: starts user-driven faceoff.
-   * For AI games: runs auto faceoff with pacing.
+   * Called after game is created. Starts the user-driven faceoff for both
+   * multiplayer and AI games — the human always clicks Roll. In AI games the
+   * AI rolls in response (see handleFaceoffRoll), so the human can follow each
+   * round instead of having the whole faceoff resolved instantly.
    */
   startFaceoff(gameId: string): void {
     const game = this.gameManager.get(gameId);
     if (!game || game.state.phase !== 'initial_roll') return;
 
-    if (game.isAiGame) {
-      this.runAIFaceoff(gameId);
-      return;
-    }
-
-    // Multiplayer: start first faceoff round with user-driven rolls
     this.startFaceoffRound(gameId);
   }
 
@@ -96,12 +105,38 @@ export class TurnRunner {
     // Emit updated state so both clients see who has rolled
     this.emitStateToAll(game);
 
-    // Check if both have rolled
+    // AI game: the AI rolls in response to the human, paced with delays so the
+    // human can watch the dice resolve one round at a time.
+    if (game.isAiGame && game.aiPlayer && game.faceoffRolls[game.aiPlayer] === null) {
+      this.scheduleAIFaceoffRoll(gameId);
+      return ok();
+    }
+
+    // Check if both have rolled (multiplayer)
     if (game.faceoffRolls.player1 !== null && game.faceoffRolls.player2 !== null) {
       this.evaluateFaceoff(gameId);
     }
 
     return ok();
+  }
+
+  /**
+   * AI rolls its faceoff die instantly in response to the human, then resolves
+   * the round. The pause that lets players read the result lives in
+   * evaluateFaceoff(), so we don't delay the roll itself here.
+   */
+  private scheduleAIFaceoffRoll(gameId: string): void {
+    const game = this.gameManager.get(gameId);
+    if (!game || game.state.phase !== 'initial_roll' || !game.aiPlayer) return;
+    if (game.faceoffRolls[game.aiPlayer] !== null) return;
+
+    game.faceoffRolls[game.aiPlayer] = secureRoll();
+    logger.debug({ gameId, roll: game.faceoffRolls[game.aiPlayer], round: game.faceoffRound }, '[TurnRunner] AI-FACEOFF-ROLL');
+    this.emitStateToAll(game);
+
+    if (game.faceoffRolls.player1 !== null && game.faceoffRolls.player2 !== null) {
+      this.evaluateFaceoff(gameId);
+    }
   }
 
   // ── Normal gameplay ────────────────────────────────────────────────────────
@@ -190,6 +225,7 @@ export class TurnRunner {
 
     try {
       const state = await this.gameManager.resign(game, playerId);
+      this.registerRematch(game);
       this.io.to(gameId).emit('GAME_OVER', {
         winner: state.winner!,
         reason: 'resign',
@@ -432,50 +468,24 @@ export class TurnRunner {
     if (game.state.initialRolls.decided) {
       logger.info({ gameId, firstPlayer: game.state.initialRolls.firstPlayer }, '[TurnRunner] Faceoff decided');
 
-      // Emit playing state and start roll timer for the winner's first roll
+      // Transition to the board immediately so server and clients stay in sync.
+      // The ~1.5s "who goes first" pause is presented CLIENT-SIDE (it holds the
+      // faceoff overlay briefly) — doing it server-side would leave the server in
+      // 'playing' while clients still show 'initial_roll', which desyncs the game.
       this.emitStateToAll(game);
-
-      // Winner must now roll to start. afterAction handles roll timer.
-      this.afterAction(gameId);
+      this.afterAction(gameId); // winner must now roll to start
     } else {
       logger.debug({ gameId, p1, p2 }, '[TurnRunner] Faceoff undecided, starting next round');
 
-      // Not decided — start another round after a brief visual delay
+      // Not decided — keep phase as 'initial_roll' (server stays in sync with the
+      // clients) and show the "no winner / tie" result briefly before the next round.
       this.emitStateToAll(game);
       setTimeout(() => {
         this.startFaceoffRound(gameId);
-      }, 1000);
+      }, FACEOFF_RESULT_PAUSE_MS);
     }
   }
 
-  /** AI faceoff: auto-roll both players with pacing. */
-  private async runAIFaceoff(gameId: string): Promise<void> {
-    const game = this.gameManager.get(gameId);
-    if (!game) return;
-
-    const delay = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
-
-    // Emit initial state so client sees phase='initial_roll'
-    this.emitStateToAll(game);
-
-    let maxRounds = 20;
-    while (!game.state.initialRolls.decided && maxRounds-- > 0) {
-      await delay(800);
-      const result = this.gameManager.doInitialRoll(game);
-      this.io.to(gameId).emit('GAME_INITIAL_ROLL', {
-        player1Roll: result.p1Roll,
-        player2Roll: result.p2Roll,
-        decided: result.decided,
-        firstPlayer: result.firstPlayer,
-        round: game.state.initialRolls.rounds.length,
-      });
-    }
-
-    if (game.state.phase === 'playing') {
-      await delay(500);
-      this.onGameReady(gameId);
-    }
-  }
 
   // ━━ AI pacing (step-by-step with delays) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -488,7 +498,15 @@ export class TurnRunner {
     try {
       let iterations = 0;
       while (iterations++ < 20) {
-        const game = this.gameManager.get(gameId);
+        let game = this.gameManager.get(gameId);
+        if (!game || game.state.phase !== 'playing') break;
+        if (game.state.currentPlayer !== game.aiPlayer) break;
+        if (game.state.turnPhase !== 'roll') break;
+
+        // Pause before the AI rolls so the human can follow the turn unfold
+        // (otherwise the roll lands the instant the human's move resolves).
+        await delay(this.aiDelay);
+        game = this.gameManager.get(gameId);
         if (!game || game.state.phase !== 'playing') break;
         if (game.state.currentPlayer !== game.aiPlayer) break;
         if (game.state.turnPhase !== 'roll') break;
@@ -588,26 +606,42 @@ export class TurnRunner {
    * If they reconnect within DISCONNECT_GRACE_MS, cancelDisconnectTimer() cancels this.
    * If they don't, the game is forfeited to the opponent.
    */
-  handleDisconnectForfeit(userId: string): void {
+  handleDisconnectForfeit(userId: string, immediate = false): void {
     const game = this.gameManager.getByUser(userId);
-    if (!game || game.isAiGame || game.state.phase === 'finished') return;
+    if (!game || game.state.phase === 'finished') return;
 
     // Cancel any existing timer for this user (e.g. rapid disconnect/reconnect)
     this.cancelDisconnectTimer(userId);
 
-    const timer = setTimeout(async () => {
+    const forfeit = async () => {
       this.disconnectTimers.delete(userId);
       const activeGame = this.gameManager.getByUser(userId);
-      if (!activeGame || activeGame.isAiGame || activeGame.state.phase === 'finished') return;
+      if (!activeGame || activeGame.state.phase === 'finished') return;
 
       const playerId = this.gameManager.getPlayerIdForUser(activeGame, userId);
       if (!playerId) return;
 
+      // AI games have no opponent to award — just tear the game down.
+      if (activeGame.isAiGame) {
+        this.cleanupGame(activeGame.gameId);
+        this.gameManager.clearUserMapping(userId);
+        return;
+      }
+
       const winner: PlayerId = playerId === 'player1' ? 'player2' : 'player1';
       activeGame.state = { ...activeGame.state, phase: 'finished', winner };
       await this.finishGame(activeGame, winner, 'disconnect');
-    }, DISCONNECT_GRACE_MS);
+    };
 
+    if (immediate) {
+      // Logout / explicit quit — end the game now, no grace period.
+      void forfeit();
+      return;
+    }
+
+    if (game.isAiGame) return; // AI games tolerate transient disconnects
+
+    const timer = setTimeout(forfeit, DISCONNECT_GRACE_MS);
     this.disconnectTimers.set(userId, timer);
   }
 
@@ -625,6 +659,7 @@ export class TurnRunner {
     this.cleanupGame(game.gameId);
     try {
       await this.gameManager.endGame(game, winner, reason);
+      this.registerRematch(game);
       this.io.to(game.gameId).emit('GAME_OVER', {
         winner,
         reason: reason as any,
@@ -644,6 +679,8 @@ export class TurnRunner {
       sock?.emit('GAME_STATE', {
         gameState: game.state,
         yourPlayer: pid,
+        yourColor: player.houseColor,
+        opponentId: opponent.userId,
         opponentName: opponent.displayName,
         opponentColor: opponent.houseColor,
         isAiGame: game.isAiGame,
@@ -657,11 +694,14 @@ export class TurnRunner {
 
   /** Emit GAME_STATE to a single reconnecting socket. */
   emitStateToSocket(game: ActiveGame, playerId: PlayerId, socketId: string): void {
+    const me = game.players[playerId];
     const opponent = playerId === 'player1' ? game.players.player2 : game.players.player1;
     const sock = this.io.sockets.sockets.get(socketId);
     sock?.emit('GAME_STATE', {
       gameState: game.state,
       yourPlayer: playerId,
+      yourColor: me.houseColor,
+      opponentId: opponent.userId,
       opponentName: opponent.displayName,
       opponentColor: opponent.houseColor,
       isAiGame: game.isAiGame,

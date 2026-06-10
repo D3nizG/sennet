@@ -4,7 +4,7 @@ import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { Board } from '../Board/Board';
-import { EgyptianPageShell, ParchmentButton } from '../EgyptianTheme';
+import { EgyptianPageShell, ParchmentButton, EgyptianButton } from '../EgyptianTheme';
 import { GameHUD } from './GameHUD';
 import { GameActionArea } from './GameActionArea';
 import { BottomGamePanel } from './BottomGamePanel';
@@ -21,17 +21,24 @@ export function GameView() {
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [rollingPreview, setRollingPreview] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState('');
+  const [chatUnread, setChatUnread] = useState(false);
+  const prevChatCountRef = useRef(0);
   const rollAnimIntervalRef = useRef<number | null>(null);
   const rollAnimTimeoutRef = useRef<number | null>(null);
 
   const {
-    gameState, yourPlayer, opponentName, opponentColor,
+    gameState, yourPlayer, yourColor, opponentId, opponentName, opponentColor,
     legalMoves, lastRoll, lastEvent, gameOver,
     initialRolls, inGame, isAiGame,
     moveDeadline, rollDeadlineAt, faceoffRolls, faceoffRound,
     chatMessages, sendChatMessage,
-    roll, move, resign, resetGame, requestRejoin,
+    rematchRequested, rematchOpponentReady, rematchOpponentLeft,
+    roll, move, resign, resetGame, requestRejoin, requestRematch,
   } = game;
+
+  // The server resolves color clashes per game; use that resolved color for our
+  // own pieces (falling back to the profile preference before state arrives).
+  const myColor = yourColor || user?.houseColor || '#D4AF37';
 
   // ── Countdown timer ──────────────────────────────────────────────────────
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -71,10 +78,58 @@ export function GameView() {
   const canRoll       = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'roll';
   const canMove       = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'move' && legalMoves.length > 0;
   const isFaceoff     = gameState?.phase === 'initial_roll';
-  const yourFaceoffRoll = yourPlayer ? faceoffRolls?.[yourPlayer] ?? null : null;
   const oppPlayer       = yourPlayer === 'player1' ? 'player2' : 'player1';
-  const oppFaceoffRoll  = faceoffRolls?.[oppPlayer] ?? null;
-  const canFaceoffRoll  = !!isFaceoff && yourFaceoffRoll === null;
+  const liveYourFaceoffRoll = yourPlayer ? faceoffRolls?.[yourPlayer] ?? null : null;
+  const liveOppFaceoffRoll  = faceoffRolls?.[oppPlayer] ?? null;
+  const canFaceoffRoll  = !!isFaceoff && liveYourFaceoffRoll === null;
+
+  const lastResolvedRound = initialRolls.length > 0 ? initialRolls[initialRolls.length - 1] : null;
+
+  // After a decided faceoff the server immediately moves to 'playing' (kept in
+  // sync). We briefly HOLD the faceoff overlay client-side so the player can read
+  // who goes first before the board appears. This must only fire on the actual
+  // initial_roll → playing TRANSITION — not on remount (e.g. returning from an
+  // opponent's profile mid-game), where the decided round is still in history.
+  const [faceoffHold, setFaceoffHold] = useState(false);
+  const prevPhaseRef = useRef(gameState?.phase);
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    const curr = gameState?.phase;
+    prevPhaseRef.current = curr;
+    if (prev === 'initial_roll' && curr === 'playing' && lastResolvedRound?.decided) {
+      setFaceoffHold(true);
+      const t = window.setTimeout(() => setFaceoffHold(false), 1500);
+      return () => window.clearTimeout(t);
+    }
+  }, [gameState?.phase, lastResolvedRound]);
+
+  const showFaceoff = isFaceoff || faceoffHold;
+
+  // Roll values to show: live faceoff rolls while in the faceoff phase, or the
+  // just-resolved round's rolls during the post-decision hold.
+  const yourFaceoffRoll = isFaceoff
+    ? liveYourFaceoffRoll
+    : lastResolvedRound ? (yourPlayer === 'player1' ? lastResolvedRound.player1Roll : lastResolvedRound.player2Roll) : null;
+  const oppFaceoffRoll = isFaceoff
+    ? liveOppFaceoffRoll
+    : lastResolvedRound ? (yourPlayer === 'player1' ? lastResolvedRound.player2Roll : lastResolvedRound.player1Roll) : null;
+
+  // Faceoff status message — persists the result of the round just resolved.
+  const bothFaceoffRolled = showFaceoff && yourFaceoffRoll !== null && oppFaceoffRoll !== null;
+  const faceoffStatus = !showFaceoff
+    ? null
+    : bothFaceoffRolled && lastResolvedRound
+      ? lastResolvedRound.decided
+        ? lastResolvedRound.firstPlayer === yourPlayer
+          ? 'You go first!'
+          : `${opponentName || 'Opponent'} goes first!`
+        : lastResolvedRound.player1Roll === 1 && lastResolvedRound.player2Roll === 1
+          ? 'Tied — Roll Again'
+          : 'No winner — Roll Again'
+      : yourFaceoffRoll !== null && oppFaceoffRoll === null
+        ? 'Waiting for opponent…'
+        : null;
+
   const isMovePhase     = gameState?.phase === 'playing' && gameState.turnPhase === 'move';
   const activeDeadline  = isMovePhase ? moveDeadline : rollDeadlineAt;
   const deadlineWindowSeconds = isMovePhase ? 13 : 5;
@@ -137,6 +192,22 @@ export function GameView() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [canRoll, canFaceoffRoll, handleRollAction]);
 
+  // ── Chat unread indicator ─────────────────────────────────────────────────
+  useEffect(() => {
+    const prevCount = prevChatCountRef.current;
+    prevChatCountRef.current = chatMessages.length;
+    if (chatMessages.length > prevCount) {
+      const last = chatMessages[chatMessages.length - 1];
+      if (last && last.senderId !== user?.id && activePanelTab !== 'chat') {
+        setChatUnread(true);
+      }
+    }
+  }, [chatMessages, activePanelTab, user?.id]);
+
+  useEffect(() => {
+    if (activePanelTab === 'chat') setChatUnread(false);
+  }, [activePanelTab]);
+
   // ── Back / resign handlers ───────────────────────────────────────────────
   const resignAndLeaveRef = useRef(false);
 
@@ -191,7 +262,7 @@ export function GameView() {
   }
 
   // ── Timer bar ────────────────────────────────────────────────────────────
-  const showTimer = timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame;
+  const showTimer = timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && !faceoffHold;
   const timerBar = showTimer ? (
     <div className={`game-timer-bar${timeLeft <= 2 ? ' game-timer-bar--urgent' : ''}`}>
       <div
@@ -223,7 +294,7 @@ export function GameView() {
         {/* ── Player HUD ── */}
         <GameHUD
           yourName={user?.displayName ?? user?.username ?? 'You'}
-          yourColor={user?.houseColor ?? '#D4AF37'}
+          yourColor={myColor}
           yourBorneOff={yourBorneOff}
           opponentName={opponentName || 'Opponent'}
           opponentColor={opponentColor || '#8B4513'}
@@ -231,66 +302,58 @@ export function GameView() {
           isYourTurn={isYourTurn}
           gameOver={!!gameOver}
           isAiGame={isAiGame}
-          isFaceoff={isFaceoff}
+          isFaceoff={showFaceoff}
           onProfileClick={() => navigate('/profile')}
+          onOpponentClick={
+            !isAiGame && opponentId ? () => navigate(`/profile/${opponentId}`) : undefined
+          }
         />
 
         {timerBar}
 
         {/* ── Faceoff panel ── */}
-        {isFaceoff && (
+        {showFaceoff && (
           <div className="game-faceoff-area">
             <div className="faceoff-card egypt-panel">
               <h3 className="egypt-heading faceoff-title">Faceoff — Roll for First Move</h3>
               <p className="egypt-muted faceoff-subtitle">First to roll a 1 wins the faceoff.</p>
 
-              {initialRolls.map((r, i) => (
-                <div key={i} className="init-roll-row egypt-muted">
-                  Round {i + 1}: You rolled {yourPlayer === 'player1' ? r.player1Roll : r.player2Roll},{' '}
-                  Opponent rolled {yourPlayer === 'player1' ? r.player2Roll : r.player1Roll}
-                  {r.decided
-                    ? r.firstPlayer === yourPlayer ? ' — You win!' : ' — Opponent wins!'
-                    : ' — No winner'}
+              <div className="faceoff-current-round">
+                <p className="faceoff-round-label egypt-label">Round {faceoffRound}</p>
+                <div className="faceoff-roll-status">
+                  <span className={`faceoff-chip${yourFaceoffRoll !== null ? ' faceoff-chip--rolled' : ' faceoff-chip--waiting'}`}>
+                    You: {yourFaceoffRoll !== null ? yourFaceoffRoll : '…'}
+                  </span>
+                  <span className={`faceoff-chip${oppFaceoffRoll !== null ? ' faceoff-chip--rolled' : ' faceoff-chip--waiting'}`}>
+                    Opponent: {oppFaceoffRoll !== null ? oppFaceoffRoll : '…'}
+                  </span>
                 </div>
-              ))}
+              </div>
 
-              {faceoffRound > initialRolls.length && (
-                <div className="faceoff-current-round">
-                  <p className="faceoff-round-label egypt-label">Round {faceoffRound}</p>
-                  <div className="faceoff-roll-status">
-                    <span className={`faceoff-chip${yourFaceoffRoll !== null ? ' faceoff-chip--rolled' : ' faceoff-chip--waiting'}`}>
-                      You: {yourFaceoffRoll !== null ? yourFaceoffRoll : '…'}
-                    </span>
-                    <span className={`faceoff-chip${oppFaceoffRoll !== null ? ' faceoff-chip--rolled' : ' faceoff-chip--waiting'}`}>
-                      Opponent: {oppFaceoffRoll !== null ? oppFaceoffRoll : '…'}
-                    </span>
-                  </div>
-                </div>
-              )}
+              <ParchmentButton
+                className="faceoff-roll-btn"
+                onClick={handleRollAction}
+                disabled={!canFaceoffRoll}
+              >
+                Roll Die
+              </ParchmentButton>
 
-              {canFaceoffRoll && (
-                <ParchmentButton className="faceoff-roll-btn" onClick={handleRollAction}>
-                  Roll Die
-                </ParchmentButton>
-              )}
-              {isFaceoff && yourFaceoffRoll !== null && oppFaceoffRoll === null && (
-                <p className="egypt-muted faceoff-waiting">
-                  You rolled {yourFaceoffRoll}. Waiting for opponent…
-                </p>
+              {faceoffStatus && (
+                <p className="egypt-muted faceoff-waiting">{faceoffStatus}</p>
               )}
             </div>
           </div>
         )}
 
         {/* ── Board + action + bottom panel (centered column) ── */}
-        {!isFaceoff && (
+        {!showFaceoff && (
           <div className="game-center-col">
             <div className="game-board-section">
               <Board
                 gameState={gameState}
                 yourPlayer={yourPlayer}
                 opponentColor={opponentColor || '#8B4513'}
-                yourColor={user?.houseColor ?? '#D4AF37'}
+                yourColor={myColor}
                 legalMoves={canMove ? legalMoves : []}
                 selectedPiece={selectedPiece}
                 onSelectPiece={handleSelectPiece}
@@ -323,6 +386,7 @@ export function GameView() {
               currentUserId={user?.id ?? ''}
               showResign={gameState.phase === 'playing'}
               onResignRequest={handleRequestResign}
+              chatHasUnread={chatUnread}
             />
           </div>
         )}
@@ -335,8 +399,8 @@ export function GameView() {
             <h3 className="egypt-heading">Confirm Resign</h3>
             <p className="egypt-muted">Are you sure you want to resign this game?</p>
             <div className="overlay-actions">
-              <button className="btn-secondary" onClick={handleCancelResign}>Cancel</button>
-              <button className="btn-danger" onClick={handleConfirmResign}>Resign</button>
+              <EgyptianButton onClick={handleCancelResign}>Cancel</EgyptianButton>
+              <EgyptianButton danger onClick={handleConfirmResign}>Resign</EgyptianButton>
             </div>
           </div>
         </div>
@@ -359,15 +423,22 @@ export function GameView() {
                   ? 'Opponent auto-resigned due to inactivity.'
                   : 'Auto-resigned due to inactivity.')}
             </p>
+            {!isAiGame && rematchOpponentReady && !rematchRequested && !rematchOpponentLeft && (
+              <p className="egypt-muted game-over-reason">{opponentName || 'Opponent'} wants a rematch!</p>
+            )}
             <div className="overlay-actions">
               {!isAiGame && (
-                <ParchmentButton
-                  onClick={() => { resetGame(); navigate('/', { state: { autoQueue: true } }); }}
-                >
-                  Play Again
-                </ParchmentButton>
+                rematchOpponentLeft ? (
+                  <ParchmentButton disabled>Opponent Left</ParchmentButton>
+                ) : rematchRequested ? (
+                  <ParchmentButton disabled>Waiting…</ParchmentButton>
+                ) : (
+                  <ParchmentButton onClick={requestRematch}>
+                    {rematchOpponentReady ? 'Accept Rematch' : 'Play Again'}
+                  </ParchmentButton>
+                )
               )}
-              <button className="btn-secondary" onClick={handleBack}>Back to Lobby</button>
+              <EgyptianButton onClick={handleBack}>Back to Lobby</EgyptianButton>
             </div>
           </div>
         </div>

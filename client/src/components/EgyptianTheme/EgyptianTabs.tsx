@@ -3,6 +3,8 @@ import './EgyptianTabs.css';
 interface Tab {
   id: string;
   label: string;
+  /** Show a small red alert dot on the tab (e.g. unread messages). */
+  dot?: boolean;
 }
 
 interface EgyptianTabsProps {
@@ -24,6 +26,7 @@ export function EgyptianTabs({ tabs, activeTab, onTabChange, className }: Egypti
           onClick={() => onTabChange(tab.id)}
         >
           {tab.label}
+          {tab.dot && <span className="egypt-tab__dot" aria-label="unread" />}
         </button>
       ))}
     </div>

@@ -23,8 +23,8 @@
 /* Resign button inside panel header */
 .panel-resign-btn {
   margin-left: auto;
-  padding: 0.3rem 0.8rem;
-  font-size: 0.75rem;
+  padding: 0.3rem 0.8rem !important;
+  font-size: 0.75rem !important;
 }
 
 /* ── Panel Body ────────────────────────────────────────────────────────────── */
@@ -141,9 +141,10 @@
 }
 
 .chat-send {
-  font-size: 0.72rem;
-  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem !important;
+  padding: 0.3rem 0.7rem !important;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Help */

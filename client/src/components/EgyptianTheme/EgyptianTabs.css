@@ -29,3 +29,19 @@
   border-color: var(--egypt-border);
   background: rgba(216, 169, 58, 0.13);
 }
+
+.egypt-tab {
+  position: relative;
+}
+
+.egypt-tab__dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--egypt-loss);
+  border: 1px solid var(--egypt-bg);
+  box-shadow: 0 0 6px rgba(239, 77, 77, 0.7);
+}

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import type { MoveLogEntry } from '@sennet/game-engine';
-import { EgyptianPanel, EgyptianTabs } from '../EgyptianTheme';
+import { EgyptianPanel, EgyptianTabs, EgyptianButton } from '../EgyptianTheme';
 import { BEAR_OFF_POSITION } from '@sennet/game-engine';
 import './BottomGamePanel.css';
 
@@ -24,6 +24,7 @@ interface BottomGamePanelProps {
   currentUserId: string;
   showResign: boolean;
   onResignRequest: () => void;
+  chatHasUnread?: boolean;
 }
 
 const TABS = [
@@ -44,6 +45,7 @@ export function BottomGamePanel({
   currentUserId,
   showResign,
   onResignRequest,
+  chatHasUnread,
 }: BottomGamePanelProps) {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -58,18 +60,16 @@ export function BottomGamePanel({
           tabs={TABS.map(t => ({
             id: t.id,
             label: t.id === 'log' ? `Move Log (${moveLog.length})` : t.label,
+            dot: t.id === 'chat' ? chatHasUnread : false,
           }))}
           activeTab={activeTab}
           onTabChange={id => onTabChange(id as PanelTab)}
         />
 
         {showResign && (
-          <button
-            className="panel-resign-btn btn-danger"
-            onClick={onResignRequest}
-          >
+          <EgyptianButton danger className="panel-resign-btn" onClick={onResignRequest}>
             Resign
-          </button>
+          </EgyptianButton>
         )}
       </div>
 
@@ -125,13 +125,13 @@ export function BottomGamePanel({
                 placeholder="Message…"
                 maxLength={500}
               />
-              <button
+              <EgyptianButton
                 type="submit"
-                className="btn-primary chat-send"
+                className="chat-send"
                 disabled={!chatInput.trim()}
               >
                 Send
-              </button>
+              </EgyptianButton>
             </form>
           </div>
         )}

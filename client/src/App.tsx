@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { AuthForm } from './components/Auth/AuthForm';
 import { LobbyView } from './components/Lobby/LobbyView';
@@ -10,8 +10,13 @@ import './App.css';
 function AuthedApp() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   if (!user) return null;
+
+  // While viewing any profile page, ProfileView shows its own back button —
+  // hide the redundant nameplate in the header.
+  const onProfilePage = location.pathname.startsWith('/profile');
 
   return (
     <Routes>
@@ -27,10 +32,13 @@ function AuthedApp() {
               username={user.displayName || user.username}
               avatarColor={user.houseColor}
               onProfileClick={() => navigate('/profile')}
+              hideProfile={onProfilePage}
+              onBack={() => navigate(-1)}
             />
             <Routes>
               <Route path="/" element={<LobbyView />} />
               <Route path="/profile" element={<ProfileView />} />
+              <Route path="/profile/:id" element={<ProfileView />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </EgyptianPageShell>

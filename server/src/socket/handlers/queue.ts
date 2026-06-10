@@ -69,12 +69,12 @@ export function registerQueueHandlers(
         // Notify both players
         s1?.emit('QUEUE_MATCHED', {
           gameId: game.gameId,
-          opponent: { id: p2.userId, displayName: p2.displayName, houseColor: p2.houseColor },
+          opponent: { id: p2.userId, displayName: p2.displayName, houseColor: game.players.player2.houseColor },
           yourPlayer: 'player1' as PlayerId,
         });
         s2?.emit('QUEUE_MATCHED', {
           gameId: game.gameId,
-          opponent: { id: p1.userId, displayName: p1.displayName, houseColor: p1.houseColor },
+          opponent: { id: p1.userId, displayName: p1.displayName, houseColor: game.players.player1.houseColor },
           yourPlayer: 'player2' as PlayerId,
         });
 

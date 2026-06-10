@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { api } from '../../services/api';
@@ -27,6 +28,8 @@ const HOUSE_COLORS = [
 ];
 
 export function ProfileView() {
+  const { id } = useParams<{ id?: string }>();
+  const isOwnProfile = !id;
   const { updateUser, logout } = useAuth();
   const { socket } = useSocket();
   const [profile, setProfile] = useState<any>(null);
@@ -36,20 +39,42 @@ export function ProfileView() {
   const [displayName, setDisplayName] = useState('');
   const [houseColor, setHouseColor] = useState('');
   const [saving, setSaving] = useState(false);
+  type FriendState = 'none' | 'pending_sent' | 'pending_received' | 'friends';
+  const [friendState, setFriendState] = useState<FriendState>('none');
 
-  useEffect(() => {
-    api.getProfile()
+  const loadProfile = useCallback((showLoading = false) => {
+    if (showLoading) setLoading(true);
+    const fetchProfile = isOwnProfile ? api.getProfile() : api.getUserById(id!);
+    return fetchProfile
       .then(data => {
         setProfile(data);
         setDisplayName(data.displayName);
         setHouseColor(data.houseColor);
+        setFriendState(data.friendStatus ?? 'none');
       })
       .catch(err => {
         console.error(err);
-        setError('Failed to load profile.');
+        if (showLoading) setError(isOwnProfile ? 'Failed to load profile.' : 'Failed to load this player.');
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => { if (showLoading) setLoading(false); });
+  }, [id, isOwnProfile]);
+
+  useEffect(() => {
+    setError(null);
+    setEditing(false);
+    setFriendState('none');
+    void loadProfile(true);
+  }, [loadProfile]);
+
+  // Refresh when friendships change (e.g. the other player accepts our request)
+  // so stats / recent games appear and the action button updates without a
+  // manual reload. Only relevant when viewing someone else's profile.
+  useEffect(() => {
+    if (isOwnProfile || !socket) return;
+    const onFriendsUpdated = () => { void loadProfile(false); };
+    socket.on('FRIENDS_UPDATED', onFriendsUpdated);
+    return () => { socket.off('FRIENDS_UPDATED', onFriendsUpdated); };
+  }, [isOwnProfile, socket, loadProfile]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -66,6 +91,25 @@ export function ProfileView() {
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddOrAcceptFriend = async () => {
+    if (!profile?.username) return;
+    try {
+      // addFriend doubles as "accept" — if they already sent us a request the
+      // server resolves it to an accepted friendship.
+      const res = await api.addFriend(profile.username);
+      if (res?.status === 'accepted') {
+        // Now friends — refetch so full stats + recent games appear.
+        setFriendState('friends');
+        void loadProfile(false);
+      } else {
+        setFriendState('pending_sent');
+      }
+    } catch (err: any) {
+      if (/already friends/i.test(err?.message ?? '')) { setFriendState('friends'); void loadProfile(false); }
+      else if (/already sent/i.test(err?.message ?? '')) setFriendState('pending_sent');
     }
   };
 
@@ -179,14 +223,29 @@ export function ProfileView() {
                 <h1 className="profile-display-name egypt-display">{profile.displayName}</h1>
                 <p className="profile-handle egypt-muted">@{profile.username}</p>
               </div>
-              <div className="profile-hero__actions">
-                <EgyptianButton onClick={() => setEditing(true)}>
-                  Edit Profile
-                </EgyptianButton>
-                <EgyptianButton className="profile-signout-btn" onClick={logout}>
-                  Sign Out
-                </EgyptianButton>
-              </div>
+              {isOwnProfile ? (
+                <div className="profile-hero__actions">
+                  <EgyptianButton onClick={() => setEditing(true)}>
+                    Edit Profile
+                  </EgyptianButton>
+                  <EgyptianButton className="profile-signout-btn" onClick={logout}>
+                    Sign Out
+                  </EgyptianButton>
+                </div>
+              ) : friendState !== 'friends' && (
+                <div className="profile-hero__actions">
+                  <EgyptianButton
+                    onClick={handleAddOrAcceptFriend}
+                    disabled={friendState === 'pending_sent'}
+                  >
+                    {friendState === 'pending_sent'
+                      ? 'Request Sent'
+                      : friendState === 'pending_received'
+                        ? 'Accept Request'
+                        : '+ Add Friend'}
+                  </EgyptianButton>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -208,7 +267,8 @@ export function ProfileView() {
           </div>
         </div>
 
-        {/* ── Recent Games ── */}
+        {/* ── Recent Games (own profile, or a friend's) ── */}
+        {profile.recentGames && (
         <div className="profile-section profile-section--games">
           <SectionTitle align="left">Recent Games</SectionTitle>
 
@@ -278,6 +338,7 @@ export function ProfileView() {
             )}
           </div>
         </div>
+        )}
 
       </EgyptianPanel>
     </div>

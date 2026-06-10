@@ -7,6 +7,10 @@ interface GameHeaderProps {
   avatarColor?: string;
   onProfileClick?: () => void;
   className?: string;
+  /** Hide the profile nameplate (e.g. while already viewing a profile page). */
+  hideProfile?: boolean;
+  /** When set, a Back button is shown in the top-right slot instead of the nameplate. */
+  onBack?: () => void;
 }
 
 export function BrandMark() {
@@ -59,17 +63,27 @@ export function UserNameplate({ username, handle, avatarColor, onProfileClick }:
   );
 }
 
-export function GameHeader({ username, handle, avatarColor, onProfileClick, className }: GameHeaderProps) {
+export function GameHeader({ username, handle, avatarColor, onProfileClick, className, hideProfile, onBack }: GameHeaderProps) {
   const navigate = useNavigate();
   return (
     <header className={`egypt-site-header ${className ?? ''}`}>
       <BrandMark />
-      <UserNameplate
-        username={username}
-        handle={handle}
-        avatarColor={avatarColor}
-        onProfileClick={onProfileClick ?? (() => navigate('/profile'))}
-      />
+      {hideProfile ? (
+        <button
+          className="header-back-btn egypt-label"
+          onClick={onBack ?? (() => navigate(-1))}
+          aria-label="Go back"
+        >
+          ← Back
+        </button>
+      ) : (
+        <UserNameplate
+          username={username}
+          handle={handle}
+          avatarColor={avatarColor}
+          onProfileClick={onProfileClick ?? (() => navigate('/profile'))}
+        />
+      )}
     </header>
   );
 }

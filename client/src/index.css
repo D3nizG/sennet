@@ -28,6 +28,9 @@
   --egypt-navy-850: #0a1a2d;
   --egypt-navy-800: #0d2742;
 
+  /* Strong dark blue for text/icons sitting on gold gradients (high contrast) */
+  --egypt-on-gold: #0a2447;
+
   --egypt-panel: rgba(7, 19, 33, 0.92);
   --egypt-panel-soft: rgba(13, 39, 66, 0.72);
   --egypt-panel-deep: rgba(3, 10, 20, 0.96);

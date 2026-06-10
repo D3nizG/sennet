@@ -29,3 +29,16 @@
 .egypt-btn--full {
   width: 100%;
 }
+
+/* Destructive actions (Resign, etc.) — themed, not a flat red block. */
+.egypt-btn--danger {
+  color: var(--egypt-loss);
+  border-color: rgba(239, 77, 77, 0.45);
+}
+
+.egypt-btn--danger:hover:not(:disabled) {
+  color: #ff6b6b;
+  border-color: rgba(239, 77, 77, 0.75);
+  background: rgba(239, 77, 77, 0.12);
+  box-shadow: 0 0 16px rgba(239, 77, 77, 0.25);
+}

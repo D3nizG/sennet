@@ -53,6 +53,9 @@ export const api = {
 
   getProfile: () => request<any>('/profile/me'),
 
+  // Public profile of another user (opponent / friend) — safe fields only.
+  getUserById: (id: string) => request<any>(`/users/${id}`),
+
   updateProfile: (data: { displayName?: string; houseColor?: string }) =>
     request<any>('/profile/me', { method: 'PATCH', body: JSON.stringify(data) }),
 

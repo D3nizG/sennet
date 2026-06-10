@@ -8,9 +8,10 @@ interface PlayerStatusProps {
   isActive: boolean;
   side: 'left' | 'right';
   onProfileClick?: () => void;
+  profileTitle?: string;
 }
 
-function PlayerStatus({ name, color, borneOff, isActive, side, onProfileClick }: PlayerStatusProps) {
+function PlayerStatus({ name, color, borneOff, isActive, side, onProfileClick, profileTitle }: PlayerStatusProps) {
   const initials = name ? name[0].toUpperCase() : '?';
 
   const inner = (
@@ -38,7 +39,7 @@ function PlayerStatus({ name, color, borneOff, isActive, side, onProfileClick }:
       <button
         className={`hud-player hud-player--${side} hud-player--clickable${isActive ? ' hud-player--active' : ''}`}
         onClick={onProfileClick}
-        title="View your profile"
+        title={profileTitle ?? 'View profile'}
       >
         {inner}
       </button>
@@ -101,6 +102,7 @@ interface GameHUDProps {
   isAiGame: boolean;
   isFaceoff: boolean;
   onProfileClick?: () => void;
+  onOpponentClick?: () => void;
 }
 
 export function GameHUD({
@@ -115,6 +117,7 @@ export function GameHUD({
   isAiGame,
   isFaceoff,
   onProfileClick,
+  onOpponentClick,
 }: GameHUDProps) {
   return (
     <div className="game-hud">
@@ -125,6 +128,7 @@ export function GameHUD({
         isActive={isYourTurn && !gameOver}
         side="left"
         onProfileClick={onProfileClick}
+        profileTitle="View your profile"
       />
 
       <TurnBanner
@@ -140,6 +144,8 @@ export function GameHUD({
         borneOff={opponentBorneOff}
         isActive={!isYourTurn && !gameOver}
         side="right"
+        onProfileClick={onOpponentClick}
+        profileTitle={`View ${opponentName || 'opponent'}'s profile`}
       />
     </div>
   );
