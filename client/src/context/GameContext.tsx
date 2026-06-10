@@ -12,6 +12,8 @@ import type {
 interface GameInfo {
   gameState: GameState | null;
   yourPlayer: PlayerId | null;
+  yourColor: string;
+  opponentId: string | null;
   opponentName: string;
   opponentColor: string;
   isAiGame: boolean;
@@ -28,6 +30,10 @@ interface GameInfo {
   faceoffRolls: { player1: number | null; player2: number | null } | null;
   faceoffRound: number;
   chatMessages: ChatMessagePayload[];
+  // Rematch (post-game) state
+  rematchRequested: boolean;     // this client clicked Play Again
+  rematchOpponentReady: boolean; // opponent clicked Play Again
+  rematchOpponentLeft: boolean;  // opponent left the post-game screen
 }
 
 interface GameContextValue extends GameInfo {
@@ -37,11 +43,15 @@ interface GameContextValue extends GameInfo {
   resetGame: () => void;
   requestRejoin: () => void;
   sendChatMessage: (message: string) => void;
+  requestRematch: () => void;
+  leaveRematch: () => void;
 }
 
 const INITIAL_STATE: GameInfo = {
   gameState: null,
   yourPlayer: null,
+  yourColor: '',
+  opponentId: null,
   opponentName: '',
   opponentColor: '',
   isAiGame: false,
@@ -58,6 +68,9 @@ const INITIAL_STATE: GameInfo = {
   faceoffRolls: null,
   faceoffRound: 0,
   chatMessages: [],
+  rematchRequested: false,
+  rematchOpponentReady: false,
+  rematchOpponentLeft: false,
 };
 
 const GameContext = createContext<GameContextValue>({
@@ -68,6 +81,8 @@ const GameContext = createContext<GameContextValue>({
   resetGame: () => {},
   requestRejoin: () => {},
   sendChatMessage: () => {},
+  requestRematch: () => {},
+  leaveRematch: () => {},
 });
 
 // ─── Provider ────────────────────────────────────────────────────────────────
@@ -83,23 +98,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!socket) return;
 
     const onQueueMatched = (data: QueueMatchedPayload) => {
-      console.log('[GameProvider] QUEUE_MATCHED received', data.gameId); // TODO: remove
-      setGame(prev => ({
-        ...prev,
+      // Start every match from a clean slate so a previous game's gameOver,
+      // initialRolls, faceoff or board state can't bleed into the new one.
+      setGame({
+        ...INITIAL_STATE,
         inGame: true,
         gameId: data.gameId,
         yourPlayer: data.yourPlayer,
+        opponentId: data.opponent.id,
         opponentName: data.opponent.displayName,
         opponentColor: data.opponent.houseColor,
-      }));
+      });
     };
 
     const onGameState = (data: GameStatePayload) => {
-      console.log('[GameProvider] GAME_STATE received, phase:', data.gameState.phase, 'turnPhase:', data.gameState.turnPhase, 'rollDeadlineAt:', data.rollDeadlineAt, 'faceoffRound:', data.faceoffRound);
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
         yourPlayer: data.yourPlayer,
+        yourColor: data.yourColor || prev.yourColor || '',
+        opponentId: data.opponentId || prev.opponentId || null,
         opponentName: data.opponentName,
         opponentColor: data.opponentColor || prev.opponentColor || '',
         isAiGame: data.isAiGame,
@@ -117,7 +135,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onRollResult = (data: GameRollResultPayload) => {
-      console.log('[GameProvider] GAME_ROLL_RESULT value:', data.value, 'moves:', data.legalMoves.length, 'event:', data.event); // TODO: remove
       setGame(prev => ({
         ...prev,
         lastRoll: data.value,
@@ -127,7 +144,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onMoveApplied = (data: GameMoveAppliedPayload) => {
-      console.log('[GameProvider] GAME_MOVE_APPLIED event:', data.event, 'nextPlayer:', data.gameState.currentPlayer);
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
@@ -167,6 +183,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }));
     };
 
+    const onRematchUpdate = (data: { opponentReady?: boolean; opponentLeft?: boolean }) => {
+      setGame(prev => ({
+        ...prev,
+        rematchOpponentReady: data.opponentReady ? true : prev.rematchOpponentReady,
+        rematchOpponentLeft: data.opponentLeft ? true : prev.rematchOpponentLeft,
+      }));
+    };
+
     socket.on('QUEUE_MATCHED', onQueueMatched);
     socket.on('GAME_STATE', onGameState);
     socket.on('GAME_ROLL_RESULT', onRollResult);
@@ -174,8 +198,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.on('GAME_OVER', onGameOver);
     socket.on('GAME_INITIAL_ROLL', onInitialRoll);
     socket.on('GAME_CHAT', onChatMessage);
+    socket.on('REMATCH_UPDATE', onRematchUpdate);
 
     return () => {
+      socket.off('REMATCH_UPDATE', onRematchUpdate);
       socket.off('QUEUE_MATCHED', onQueueMatched);
       socket.off('GAME_STATE', onGameState);
       socket.off('GAME_ROLL_RESULT', onRollResult);
@@ -210,7 +236,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const requestRejoin = useCallback(() => {
     if (!socket?.connected || rejoinRequested.current) return;
     rejoinRequested.current = true;
-    console.log('[GameProvider] Emitting GAME_REJOIN'); // TODO: remove
     socket.emit('GAME_REJOIN');
   }, [socket]);
 
@@ -220,13 +245,32 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [socket?.connected]);
 
+  // When the socket goes away entirely (logout clears the token → SocketContext
+  // disconnects), drop any lingering game state so a re-login starts clean and
+  // doesn't auto-navigate back into a finished/forfeited game.
+  useEffect(() => {
+    if (!socket) {
+      setGame(INITIAL_STATE);
+      rejoinRequested.current = false;
+    }
+  }, [socket]);
+
   const sendChatMessage = useCallback((message: string) => {
     if (!message.trim()) return;
     socket?.emit('GAME_CHAT', { message: message.trim() });
   }, [socket]);
 
+  const requestRematch = useCallback(() => {
+    socket?.emit('REMATCH_REQUEST');
+    setGame(prev => ({ ...prev, rematchRequested: true }));
+  }, [socket]);
+
+  const leaveRematch = useCallback(() => {
+    socket?.emit('REMATCH_LEAVE');
+  }, [socket]);
+
   return (
-    <GameContext.Provider value={{ ...game, roll, move, resign, resetGame, requestRejoin, sendChatMessage }}>
+    <GameContext.Provider value={{ ...game, roll, move, resign, resetGame, requestRejoin, sendChatMessage, requestRematch, leaveRematch }}>
       {children}
     </GameContext.Provider>
   );

@@ -1,0 +1,59 @@
+.parchment-btn {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--egypt-parchment-light) 0%,
+    var(--egypt-parchment) 60%,
+    var(--egypt-gold) 100%
+  );
+  border: none;
+  border-radius: var(--egypt-radius-md);
+  padding: 0.7rem 1.6rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* ParchmentButton also carries `.egypt-display` (gold text). Override it with a
+   higher-specificity selector so the dark-blue text wins for strong contrast. */
+.parchment-btn.egypt-display {
+  color: var(--egypt-on-gold);
+}
+
+.parchment-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+.parchment-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 26px rgba(0, 0, 0, 0.48),
+    0 0 16px rgba(216, 169, 58, 0.38);
+  filter: brightness(1.07);
+}
+
+.parchment-btn:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
+
+.parchment-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.parchment-btn--full {
+  width: 100%;
+}

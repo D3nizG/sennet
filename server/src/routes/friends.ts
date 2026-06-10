@@ -87,8 +87,36 @@ export function friendsRouter(prisma: PrismaClient): Router {
           ],
         },
       });
+
       if (existing) {
-        res.status(409).json({ error: 'Friend request already exists', status: existing.status });
+        if (existing.status === 'accepted') {
+          res.status(409).json({ error: 'Already friends', status: 'accepted' });
+          return;
+        }
+        if (existing.status === 'pending') {
+          // If THEY already sent ME a request, adding them back accepts it → mutual friends.
+          if (existing.addresseeId === userId) {
+            await prisma.friendship.update({
+              where: { id: existing.id },
+              data: { status: 'accepted' },
+            });
+            emitToUser(target.id, 'FRIENDS_UPDATED');
+            emitToUser(userId, 'FRIENDS_UPDATED');
+            res.json({ friendshipId: existing.id, status: 'accepted' });
+            return;
+          }
+          // I already have a pending request out to them.
+          res.status(409).json({ error: 'Friend request already sent', status: 'pending' });
+          return;
+        }
+        // Previously rejected — allow a fresh request from me.
+        await prisma.friendship.update({
+          where: { id: existing.id },
+          data: { requesterId: userId, addresseeId: target.id, status: 'pending' },
+        });
+        emitToUser(target.id, 'FRIENDS_UPDATED');
+        emitToUser(userId, 'FRIENDS_UPDATED');
+        res.status(201).json({ friendshipId: existing.id, status: 'pending' });
         return;
       }
 

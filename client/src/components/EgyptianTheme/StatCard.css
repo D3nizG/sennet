@@ -1,0 +1,30 @@
+.egypt-stat-card {
+  background: var(--egypt-panel);
+  border: 1px solid var(--egypt-border-soft);
+  border-radius: var(--egypt-radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.egypt-stat-card:hover {
+  border-color: var(--egypt-border);
+  box-shadow: var(--egypt-shadow-gold);
+}
+
+.egypt-stat-card__value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--egypt-gold-bright);
+  line-height: 1.1;
+}
+
+.egypt-stat-card--highlight {
+  border-color: var(--egypt-border);
+  box-shadow: var(--egypt-shadow-gold);
+}

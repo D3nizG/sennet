@@ -4,6 +4,10 @@ import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { Board } from '../Board/Board';
+import { EgyptianPageShell, ParchmentButton, EgyptianButton } from '../EgyptianTheme';
+import { GameHUD } from './GameHUD';
+import { GameActionArea } from './GameActionArea';
+import { BottomGamePanel } from './BottomGamePanel';
 import { BEAR_OFF_POSITION } from '@sennet/game-engine';
 import './GameView.css';
 
@@ -17,55 +21,46 @@ export function GameView() {
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [rollingPreview, setRollingPreview] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState('');
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const [chatUnread, setChatUnread] = useState(false);
+  const prevChatCountRef = useRef(0);
   const rollAnimIntervalRef = useRef<number | null>(null);
   const rollAnimTimeoutRef = useRef<number | null>(null);
 
   const {
-    gameState, yourPlayer, opponentName, opponentColor,
+    gameState, yourPlayer, yourColor, opponentId, opponentName, opponentColor,
     legalMoves, lastRoll, lastEvent, gameOver,
     initialRolls, inGame, isAiGame,
     moveDeadline, rollDeadlineAt, faceoffRolls, faceoffRound,
     chatMessages, sendChatMessage,
-    roll, move, resign, resetGame, requestRejoin,
+    rematchRequested, rematchOpponentReady, rematchOpponentLeft,
+    roll, move, resign, resetGame, requestRejoin, requestRematch,
   } = game;
 
-  // ── Countdown timer (driven by server-side rollDeadlineAt) ──
+  // The server resolves color clashes per game; use that resolved color for our
+  // own pieces (falling back to the profile preference before state arrives).
+  const myColor = yourColor || user?.houseColor || '#D4AF37';
+
+  // ── Countdown timer ──────────────────────────────────────────────────────
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
     const deadline = gameState?.phase === 'playing' && gameState.turnPhase === 'move'
       ? moveDeadline
       : rollDeadlineAt;
-    if (!deadline) {
-      setTimeLeft(null);
-      return;
-    }
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setTimeLeft(remaining);
-    };
+    if (!deadline) { setTimeLeft(null); return; }
+    const tick = () => setTimeLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
   }, [gameState?.phase, gameState?.turnPhase, moveDeadline, rollDeadlineAt]);
 
-  // On mount, request rejoin from server in case we refreshed
   useEffect(() => {
-    if (connected && !gameState) {
-      requestRejoin();
-    }
+    if (connected && !gameState) requestRejoin();
   }, [connected, gameState, requestRejoin]);
 
-  // Clear selection when legal moves change
   useEffect(() => {
     if (legalMoves.length === 0) setSelectedPiece(null);
   }, [legalMoves]);
-
-  // Auto-scroll chat to bottom on new messages
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
 
   const handleSelectPiece = useCallback((pieceId: string) => {
     setSelectedPiece(prev => prev === pieceId ? null : pieceId);
@@ -77,57 +72,91 @@ export function GameView() {
     setSelectedPiece(null);
   }, [selectedPiece, move]);
 
-  const handleBack = useCallback(() => {
-    resetGame();
-    navigate('/');
-  }, [resetGame, navigate]);
-
-  // Keep all hooks above the early-return branches below. On refresh, `GAME_STATE`
-  // can arrive after an initial loading render, and changing hook order here will
-  // crash the page before the rejoined game can display.
+  // ── Derived state ────────────────────────────────────────────────────────
   const hasActiveGame = !!gameState && !!yourPlayer;
-  const isYourTurn = hasActiveGame ? gameState.currentPlayer === yourPlayer : false;
-  const canRoll = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'roll';
-  const canMove = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'move' && legalMoves.length > 0;
-  const isFaceoff = gameState?.phase === 'initial_roll';
-  const yourFaceoffRoll = yourPlayer ? faceoffRolls?.[yourPlayer] ?? null : null;
-  const oppPlayer = yourPlayer === 'player1' ? 'player2' : 'player1';
-  const oppFaceoffRoll = faceoffRolls?.[oppPlayer] ?? null;
-  const canFaceoffRoll = !!isFaceoff && yourFaceoffRoll === null;
-  const isMovePhase = gameState?.phase === 'playing' && gameState.turnPhase === 'move';
-  const activeDeadline = isMovePhase ? moveDeadline : rollDeadlineAt;
+  const isYourTurn    = hasActiveGame && gameState.currentPlayer === yourPlayer;
+  const canRoll       = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'roll';
+  const canMove       = hasActiveGame && isYourTurn && gameState.phase === 'playing' && gameState.turnPhase === 'move' && legalMoves.length > 0;
+  const isFaceoff     = gameState?.phase === 'initial_roll';
+  const oppPlayer       = yourPlayer === 'player1' ? 'player2' : 'player1';
+  const liveYourFaceoffRoll = yourPlayer ? faceoffRolls?.[yourPlayer] ?? null : null;
+  const liveOppFaceoffRoll  = faceoffRolls?.[oppPlayer] ?? null;
+  const canFaceoffRoll  = !!isFaceoff && liveYourFaceoffRoll === null;
+
+  const lastResolvedRound = initialRolls.length > 0 ? initialRolls[initialRolls.length - 1] : null;
+
+  // After a decided faceoff the server immediately moves to 'playing' (kept in
+  // sync). We briefly HOLD the faceoff overlay client-side so the player can read
+  // who goes first before the board appears. This must only fire on the actual
+  // initial_roll → playing TRANSITION — not on remount (e.g. returning from an
+  // opponent's profile mid-game), where the decided round is still in history.
+  const [faceoffHold, setFaceoffHold] = useState(false);
+  const prevPhaseRef = useRef(gameState?.phase);
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    const curr = gameState?.phase;
+    prevPhaseRef.current = curr;
+    if (prev === 'initial_roll' && curr === 'playing' && lastResolvedRound?.decided) {
+      setFaceoffHold(true);
+      const t = window.setTimeout(() => setFaceoffHold(false), 1500);
+      return () => window.clearTimeout(t);
+    }
+  }, [gameState?.phase, lastResolvedRound]);
+
+  const showFaceoff = isFaceoff || faceoffHold;
+
+  // Roll values to show: live faceoff rolls while in the faceoff phase, or the
+  // just-resolved round's rolls during the post-decision hold.
+  const yourFaceoffRoll = isFaceoff
+    ? liveYourFaceoffRoll
+    : lastResolvedRound ? (yourPlayer === 'player1' ? lastResolvedRound.player1Roll : lastResolvedRound.player2Roll) : null;
+  const oppFaceoffRoll = isFaceoff
+    ? liveOppFaceoffRoll
+    : lastResolvedRound ? (yourPlayer === 'player1' ? lastResolvedRound.player2Roll : lastResolvedRound.player1Roll) : null;
+
+  // Faceoff status message — persists the result of the round just resolved.
+  const bothFaceoffRolled = showFaceoff && yourFaceoffRoll !== null && oppFaceoffRoll !== null;
+  const faceoffStatus = !showFaceoff
+    ? null
+    : bothFaceoffRolled && lastResolvedRound
+      ? lastResolvedRound.decided
+        ? lastResolvedRound.firstPlayer === yourPlayer
+          ? 'You go first!'
+          : `${opponentName || 'Opponent'} goes first!`
+        : lastResolvedRound.player1Roll === 1 && lastResolvedRound.player2Roll === 1
+          ? 'Tied — Roll Again'
+          : 'No winner — Roll Again'
+      : yourFaceoffRoll !== null && oppFaceoffRoll === null
+        ? 'Waiting for opponent…'
+        : null;
+
+  const isMovePhase     = gameState?.phase === 'playing' && gameState.turnPhase === 'move';
+  const activeDeadline  = isMovePhase ? moveDeadline : rollDeadlineAt;
   const deadlineWindowSeconds = isMovePhase ? 13 : 5;
+
   const yourBorneOff = hasActiveGame
-    ? gameState.pieces.filter(p => p.owner === yourPlayer && p.position === BEAR_OFF_POSITION).length
-    : 0;
+    ? gameState.pieces.filter(p => p.owner === yourPlayer && p.position === BEAR_OFF_POSITION).length : 0;
   const opponentBorneOff = hasActiveGame
-    ? gameState.pieces.filter(p => p.owner !== yourPlayer && p.position === BEAR_OFF_POSITION).length
-    : 0;
+    ? gameState.pieces.filter(p => p.owner !== yourPlayer && p.position === BEAR_OFF_POSITION).length : 0;
+
   const eventNotice = lastEvent === 'blocked'
     ? { tone: 'blocked', text: 'Blocked! No legal moves — turn skipped.' }
     : lastEvent === 'house_of_netting'
-      ? { tone: 'trap', text: 'Landed on House of Netting — turn ends!' }
-      : lastEvent === 'waters_of_chaos'
-        ? { tone: 'trap', text: 'Waters of Chaos — piece washed back!' }
-        : lastEvent === 'bear_off'
-          ? { tone: 'good', text: 'Piece exited the board!' }
-          : lastEvent === 'capture'
-            ? { tone: 'good', text: 'Capture! Positions swapped.' }
-            : null;
-  const canBearOffSelected = canMove && !!selectedPiece && legalMoves.some(
-    m => m.pieceId === selectedPiece && m.to === BEAR_OFF_POSITION
-  );
+    ? { tone: 'trap', text: 'Landed on House of Netting — turn ends!' }
+    : lastEvent === 'waters_of_chaos'
+    ? { tone: 'trap', text: 'Waters of Chaos — piece washed back!' }
+    : lastEvent === 'bear_off'
+    ? { tone: 'good', text: 'Piece exited the board!' }
+    : lastEvent === 'capture'
+    ? { tone: 'good', text: 'Capture! Positions swapped.' }
+    : null;
+
   const yourBonusRolls = hasActiveGame && gameState.currentPlayer === yourPlayer ? gameState.extraRolls : 0;
 
+  // ── Roll animation ───────────────────────────────────────────────────────
   const clearRollAnimation = useCallback(() => {
-    if (rollAnimIntervalRef.current !== null) {
-      window.clearInterval(rollAnimIntervalRef.current);
-      rollAnimIntervalRef.current = null;
-    }
-    if (rollAnimTimeoutRef.current !== null) {
-      window.clearTimeout(rollAnimTimeoutRef.current);
-      rollAnimTimeoutRef.current = null;
-    }
+    if (rollAnimIntervalRef.current !== null) { window.clearInterval(rollAnimIntervalRef.current); rollAnimIntervalRef.current = null; }
+    if (rollAnimTimeoutRef.current  !== null) { window.clearTimeout(rollAnimTimeoutRef.current);  rollAnimTimeoutRef.current  = null; }
   }, []);
 
   const runRollAnimation = useCallback(() => {
@@ -148,384 +177,243 @@ export function GameView() {
     roll();
   }, [canRoll, canFaceoffRoll, runRollAnimation, roll]);
 
-  const handleRequestResign = useCallback(() => {
-    setShowResignConfirm(true);
-  }, []);
-
-  const handleCancelResign = useCallback(() => {
-    setShowResignConfirm(false);
-  }, []);
-
-  const handleConfirmResign = useCallback(() => {
-    setShowResignConfirm(false);
-    resign();
-  }, [resign]);
-
-  useEffect(() => {
-    return () => {
-      clearRollAnimation();
-    };
-  }, [clearRollAnimation]);
+  useEffect(() => () => clearRollAnimation(), [clearRollAnimation]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code !== 'Space') return;
       const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        return;
-      }
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       if (!canRoll && !canFaceoffRoll) return;
       event.preventDefault();
       handleRollAction();
     };
-
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [canRoll, canFaceoffRoll, handleRollAction]);
 
-  // Waiting for game state (matched but state hasn't arrived yet)
+  // ── Chat unread indicator ─────────────────────────────────────────────────
+  useEffect(() => {
+    const prevCount = prevChatCountRef.current;
+    prevChatCountRef.current = chatMessages.length;
+    if (chatMessages.length > prevCount) {
+      const last = chatMessages[chatMessages.length - 1];
+      if (last && last.senderId !== user?.id && activePanelTab !== 'chat') {
+        setChatUnread(true);
+      }
+    }
+  }, [chatMessages, activePanelTab, user?.id]);
+
+  useEffect(() => {
+    if (activePanelTab === 'chat') setChatUnread(false);
+  }, [activePanelTab]);
+
+  // ── Back / resign handlers ───────────────────────────────────────────────
+  const resignAndLeaveRef = useRef(false);
+
+  const handleBack = useCallback(() => {
+    if (hasActiveGame && !gameOver) {
+      resignAndLeaveRef.current = true;
+      setShowResignConfirm(true);
+    } else {
+      resetGame();
+      navigate('/');
+    }
+  }, [hasActiveGame, gameOver, resetGame, navigate]);
+
+  const handleRequestResign  = useCallback(() => setShowResignConfirm(true), []);
+  const handleCancelResign   = useCallback(() => setShowResignConfirm(false), []);
+  const handleConfirmResign  = useCallback(() => {
+    setShowResignConfirm(false);
+    resign();
+    if (resignAndLeaveRef.current) {
+      resignAndLeaveRef.current = false;
+      resetGame();
+      navigate('/');
+    }
+  }, [resign, resetGame, navigate]);
+
+  // ── Early return states ──────────────────────────────────────────────────
   if (inGame && (!gameState || !yourPlayer)) {
     return (
-      <div className="game-view">
-        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <p>Loading game...</p>
-        </div>
-      </div>
+      <EgyptianPageShell noScroll noHeader className="game-shell">
+        <div className="game-loading egypt-body">Loading game…</div>
+      </EgyptianPageShell>
     );
   }
 
-  // Socket not yet connected — show connecting state instead of "No active game"
   if (!connected && !inGame && !gameState) {
     return (
-      <div className="game-view">
-        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <p>Connecting...</p>
-        </div>
-      </div>
+      <EgyptianPageShell noScroll noHeader className="game-shell">
+        <div className="game-loading egypt-body">Connecting…</div>
+      </EgyptianPageShell>
     );
   }
 
-  // Not in a game — no active game on server either
   if (!gameState || !yourPlayer) {
     return (
-      <div className="game-view">
-        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <p>No active game.</p>
-          <button className="btn-primary" onClick={() => navigate('/')} style={{ marginTop: '1rem' }}>
-            Back to Lobby
-          </button>
+      <EgyptianPageShell noScroll noHeader className="game-shell">
+        <div className="game-no-game">
+          <p className="egypt-body">No active game.</p>
+          <ParchmentButton onClick={() => navigate('/')}>Back to Lobby</ParchmentButton>
         </div>
-      </div>
+      </EgyptianPageShell>
     );
   }
 
-  const renderBorneCount = (count: number, color: string) => (
-    <span className="borne-count" aria-label={`${count} of 5 borne off`}>
-      {Array.from({ length: 5 }).map((_, idx) => (
-        <span
-          key={idx}
-          className={`borne-count-dot${idx < count ? ' filled' : ''}`}
-          style={{ borderColor: color, backgroundColor: idx < count ? color : 'transparent' }}
-        />
-      ))}
-    </span>
-  );
+  // ── Timer bar ────────────────────────────────────────────────────────────
+  const showTimer = timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && !faceoffHold;
+  const timerBar = showTimer ? (
+    <div className={`game-timer-bar${timeLeft <= 2 ? ' game-timer-bar--urgent' : ''}`}>
+      <div
+        className="game-timer-fill"
+        style={{ width: `${Math.min(100, (timeLeft / deadlineWindowSeconds) * 100)}%` }}
+      />
+      <span className="game-timer-text egypt-label">
+        {isFaceoff
+          ? `Roll now! — ${timeLeft}s`
+          : isMovePhase
+          ? isYourTurn ? `Move now! — ${timeLeft}s` : `Opponent moving — ${timeLeft}s`
+          : isYourTurn ? `Roll now! — ${timeLeft}s` : `Opponent rolling — ${timeLeft}s`}
+      </span>
+    </div>
+  ) : null;
 
   return (
-    <div className="game-view">
-      {/* Header info */}
-      <div className="game-header">
-        <div className="player-info you">
-          <div className="player-dot" style={{ background: user?.houseColor ?? '#D4AF37' }} />
-          <span>{user?.displayName ?? 'You'}</span>
-          {!isFaceoff && renderBorneCount(yourBorneOff, user?.houseColor ?? '#D4AF37')}
+    <EgyptianPageShell noScroll noHeader className="game-shell">
+      <div className="game-layout">
+        {/* ── Minimal game topbar ── */}
+        <div className="game-topbar">
+          <button className="game-back-btn egypt-label" onClick={handleBack}>
+            ← Lobby
+          </button>
+          <span className="game-brand egypt-display">𓁹 Sennet</span>
+          <div style={{ width: 72 }} /> {/* spacer to balance brand */}
         </div>
-        <div className="turn-indicator">
-          {isFaceoff ? (
-            <span className="phase-badge">Rolling for first player...</span>
-          ) : gameOver ? (
-            <span className="phase-badge over">Game Over</span>
-          ) : isAiGame && !isYourTurn ? (
-            <span className="phase-badge waiting">AI thinking…</span>
-          ) : isYourTurn ? (
-            <span className="phase-badge your-turn">Your Turn</span>
-          ) : (
-            <span className="phase-badge waiting">Opponent's Turn</span>
-          )}
-        </div>
-        <div className="player-info opponent">
-          <div className="player-dot" style={{ background: opponentColor || '#8B4513' }} />
-          <span>{opponentName || 'Opponent'}</span>
-          {!isFaceoff && renderBorneCount(opponentBorneOff, opponentColor || '#8B4513')}
-        </div>
+
+        {/* ── Player HUD ── */}
+        <GameHUD
+          yourName={user?.displayName ?? user?.username ?? 'You'}
+          yourColor={myColor}
+          yourBorneOff={yourBorneOff}
+          opponentName={opponentName || 'Opponent'}
+          opponentColor={opponentColor || '#8B4513'}
+          opponentBorneOff={opponentBorneOff}
+          isYourTurn={isYourTurn}
+          gameOver={!!gameOver}
+          isAiGame={isAiGame}
+          isFaceoff={showFaceoff}
+          onProfileClick={() => navigate('/profile')}
+          onOpponentClick={
+            !isAiGame && opponentId ? () => navigate(`/profile/${opponentId}`) : undefined
+          }
+        />
+
+        {timerBar}
+
+        {/* ── Faceoff panel ── */}
+        {showFaceoff && (
+          <div className="game-faceoff-area">
+            <div className="faceoff-card egypt-panel">
+              <h3 className="egypt-heading faceoff-title">Faceoff — Roll for First Move</h3>
+              <p className="egypt-muted faceoff-subtitle">First to roll a 1 wins the faceoff.</p>
+
+              <div className="faceoff-current-round">
+                <p className="faceoff-round-label egypt-label">Round {faceoffRound}</p>
+                <div className="faceoff-roll-status">
+                  <span className={`faceoff-chip${yourFaceoffRoll !== null ? ' faceoff-chip--rolled' : ' faceoff-chip--waiting'}`}>
+                    You: {yourFaceoffRoll !== null ? yourFaceoffRoll : '…'}
+                  </span>
+                  <span className={`faceoff-chip${oppFaceoffRoll !== null ? ' faceoff-chip--rolled' : ' faceoff-chip--waiting'}`}>
+                    Opponent: {oppFaceoffRoll !== null ? oppFaceoffRoll : '…'}
+                  </span>
+                </div>
+              </div>
+
+              <ParchmentButton
+                className="faceoff-roll-btn"
+                onClick={handleRollAction}
+                disabled={!canFaceoffRoll}
+              >
+                Roll Die
+              </ParchmentButton>
+
+              {faceoffStatus && (
+                <p className="egypt-muted faceoff-waiting">{faceoffStatus}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Board + action + bottom panel (centered column) ── */}
+        {!showFaceoff && (
+          <div className="game-center-col">
+            <div className="game-board-section">
+              <Board
+                gameState={gameState}
+                yourPlayer={yourPlayer}
+                opponentColor={opponentColor || '#8B4513'}
+                yourColor={myColor}
+                legalMoves={canMove ? legalMoves : []}
+                selectedPiece={selectedPiece}
+                onSelectPiece={handleSelectPiece}
+                onSelectSquare={handleSelectSquare}
+              />
+            </div>
+
+            <GameActionArea
+              canRoll={canRoll}
+              canMove={canMove}
+              lastRoll={lastRoll}
+              rollingPreview={rollingPreview}
+              yourBonusRolls={yourBonusRolls}
+              selectedPiece={selectedPiece}
+              legalMoves={legalMoves}
+              eventNotice={eventNotice}
+              onRoll={handleRollAction}
+              onBearOff={() => handleSelectSquare(BEAR_OFF_POSITION)}
+            />
+
+            <BottomGamePanel
+              activeTab={activePanelTab}
+              onTabChange={setActivePanelTab}
+              moveLog={gameState.moveLog}
+              yourPlayerId={yourPlayer}
+              chatMessages={chatMessages}
+              chatInput={chatInput}
+              onChatInputChange={setChatInput}
+              onSendChat={() => { sendChatMessage(chatInput); setChatInput(''); }}
+              currentUserId={user?.id ?? ''}
+              showResign={gameState.phase === 'playing'}
+              onResignRequest={handleRequestResign}
+              chatHasUnread={chatUnread}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Roll Timer Bar (multiplayer only, shown for both faceoff and normal rolls) */}
-      {timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && (
-        <div className={`timer-bar${timeLeft <= 2 ? ' urgent' : ''}`}>
-          <div
-            className="timer-bar-fill"
-            style={{ width: `${Math.min(100, (timeLeft / deadlineWindowSeconds) * 100)}%` }}
-          />
-          <span className="timer-bar-text">
-            {isFaceoff
-              ? `Roll now! — ${timeLeft}s`
-              : isMovePhase
-                ? isYourTurn
-                  ? `Move now! — ${timeLeft}s`
-                  : `Opponent moving — ${timeLeft}s`
-              : isYourTurn
-                ? `Roll now! — ${timeLeft}s`
-                : `Opponent rolling — ${timeLeft}s`}
-          </span>
-        </div>
-      )}
-
-      {/* Faceoff UI */}
-      {isFaceoff && (
-        <div className="initial-rolls card">
-          <h3>Faceoff — Roll to earn first move</h3>
-          <p className="faceoff-subtitle">First to roll a 1 wins the faceoff.</p>
-
-          {/* Previous rounds */}
-          {initialRolls.map((r, i) => (
-            <div key={i} className="init-roll-row">
-              <span>Round {i + 1}: You rolled {yourPlayer === 'player1' ? r.player1Roll : r.player2Roll},
-              Opponent rolled {yourPlayer === 'player1' ? r.player2Roll : r.player1Roll}
-              {r.decided
-                ? r.firstPlayer === yourPlayer ? ' — You win!' : ' — Opponent wins!'
-                : ' — No winner'}
-              </span>
-            </div>
-          ))}
-
-          {/* Current round status */}
-          {faceoffRound > initialRolls.length && (
-            <div className="faceoff-current-round">
-              <p className="faceoff-round-label">Round {faceoffRound}</p>
-              <div className="faceoff-roll-status">
-                <span className={`faceoff-roll-chip ${yourFaceoffRoll !== null ? 'rolled' : 'waiting'}`}>
-                  You: {yourFaceoffRoll !== null ? yourFaceoffRoll : '...'}
-                </span>
-                <span className={`faceoff-roll-chip ${oppFaceoffRoll !== null ? 'rolled' : 'waiting'}`}>
-                  Opponent: {oppFaceoffRoll !== null ? oppFaceoffRoll : '...'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Roll button for faceoff */}
-          {canFaceoffRoll && (
-            <button className="btn-primary roll-btn faceoff-roll-btn" onClick={handleRollAction}>
-              Roll Die
-            </button>
-          )}
-          {isFaceoff && yourFaceoffRoll !== null && oppFaceoffRoll === null && (
-            <p className="faceoff-waiting">You rolled {yourFaceoffRoll}. Waiting for opponent...</p>
-          )}
-        </div>
-      )}
-
-      {/* Board (only during playing phase) */}
-      {gameState.phase !== 'initial_roll' && (
-        <Board
-          gameState={gameState}
-          yourPlayer={yourPlayer}
-          opponentColor={opponentColor || '#8B4513'}
-          yourColor={user?.houseColor ?? '#D4AF37'}
-          legalMoves={canMove ? legalMoves : []}
-          selectedPiece={selectedPiece}
-          onSelectPiece={handleSelectPiece}
-          onSelectSquare={handleSelectSquare}
-        />
-      )}
-
-      {/* Controls */}
-      {!isFaceoff && (
-        <div className="game-controls">
-          <div className="control-primary-row">
-            <div className="control-primary-item bonus-item">
-              <div className="bonus-roll-display">
-                <span className="bonus-roll-icon">𓋹</span>
-                <span className="bonus-roll-label">: {yourBonusRolls}</span>
-              </div>
-            </div>
-
-            <div className="control-primary-item roll-item">
-              <div className="roll-display">
-                <span className={`roll-value${lastRoll === null && rollingPreview === null ? ' empty' : ''}`}>
-                  {rollingPreview ?? lastRoll ?? '—'}
-                </span>
-                <span className="roll-label">
-                  {rollingPreview !== null
-                    ? 'Rolling...'
-                    : lastRoll === null
-                    ? 'Waiting for roll'
-                    : lastRoll === 6
-                      ? 'No move — roll again'
-                      : `Roll: ${lastRoll}`}
-                </span>
-              </div>
-            </div>
-
-            <div className="control-primary-item action-item">
-              <button className="btn-primary roll-btn" onClick={handleRollAction} disabled={!canRoll}>
-                Roll Die
-              </button>
-            </div>
-          </div>
-
-          <div className="control-slot hint-slot">
-            {canMove && (
-              <div className="move-hint">
-                Select a highlighted piece, then click a green square
-              </div>
-            )}
-          </div>
-
-          <div className="control-slot event-slot">
-            {canBearOffSelected ? (
-              <button
-                className="bear-off-inline-btn"
-                onClick={() => handleSelectSquare(BEAR_OFF_POSITION)}
-              >
-                ★ Exit Board ★
-              </button>
-            ) : eventNotice && (
-              <div className={`event-notice ${eventNotice.tone}`}>
-                {eventNotice.text}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
+      {/* ── Resign confirmation overlay ── */}
       {showResignConfirm && (
-        <div className="confirm-overlay">
-          <div className="confirm-card card">
-            <h3>Confirm Resign</h3>
-            <p>Are you sure you want to resign this game?</p>
-            <div className="confirm-actions">
-              <button className="btn-secondary" onClick={handleCancelResign}>
-                Cancel
-              </button>
-              <button className="btn-danger" onClick={handleConfirmResign}>
-                Resign
-              </button>
+        <div className="overlay-backdrop">
+          <div className="overlay-card egypt-panel">
+            <h3 className="egypt-heading">Confirm Resign</h3>
+            <p className="egypt-muted">Are you sure you want to resign this game?</p>
+            <div className="overlay-actions">
+              <EgyptianButton onClick={handleCancelResign}>Cancel</EgyptianButton>
+              <EgyptianButton danger onClick={handleConfirmResign}>Resign</EgyptianButton>
             </div>
           </div>
         </div>
       )}
 
-      {/* Move Log + Chat */}
-      {!isFaceoff && (
-        <div className="move-log-container card">
-          <div className="panel-header">
-            <div className="panel-tabs" role="tablist" aria-label="Game side panel tabs">
-              <button
-                className={`panel-tab${activePanelTab === 'log' ? ' active' : ''}`}
-                onClick={() => setActivePanelTab('log')}
-                role="tab"
-                aria-selected={activePanelTab === 'log'}
-              >
-                Move Log ({gameState.moveLog.length})
-              </button>
-              <button
-                className={`panel-tab${activePanelTab === 'chat' ? ' active' : ''}`}
-                onClick={() => setActivePanelTab('chat')}
-                role="tab"
-                aria-selected={activePanelTab === 'chat'}
-              >
-                Chat
-              </button>
-              <button
-                className={`panel-tab${activePanelTab === 'help' ? ' active' : ''}`}
-                onClick={() => setActivePanelTab('help')}
-                role="tab"
-                aria-selected={activePanelTab === 'help'}
-              >
-                Help
-              </button>
-            </div>
-            {gameState.phase === 'playing' && (
-              <button className="btn-danger resign-btn panel-resign-btn" onClick={handleRequestResign}>
-                Resign
-              </button>
-            )}
-          </div>
-
-          <div className="panel-body">
-            {activePanelTab === 'log' ? (
-              <div className="move-log" role="tabpanel">
-                {[...gameState.moveLog].reverse().slice(0, 30).map((entry, i) => (
-                  <div key={i} className="log-entry">
-                    <span className="log-turn">T{entry.turnNumber}</span>
-                    <span className={`log-player ${entry.player}`}>
-                      {entry.player === yourPlayer ? 'You' : 'Opp'}
-                    </span>
-                    <span className="log-roll">🎲{entry.rollValue}</span>
-                    <span className="log-action">
-                      {entry.move
-                        ? `${entry.move.from}→${entry.move.to === BEAR_OFF_POSITION ? 'OFF' : entry.move.to}`
-                        : entry.event ?? 'skip'}
-                    </span>
-                    {entry.event && <span className="log-event">{entry.event}</span>}
-                  </div>
-                ))}
-              </div>
-            ) : activePanelTab === 'chat' ? (
-              <div className="chat-panel" role="tabpanel">
-                <div className="chat-messages">
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} className={`chat-message ${msg.senderId === user?.id ? 'mine' : 'theirs'}`}>
-                      <span className="chat-sender">{msg.senderId === user?.id ? 'You' : msg.senderName}</span>
-                      <span className="chat-text">{msg.message}</span>
-                    </div>
-                  ))}
-                  <div ref={chatEndRef} />
-                </div>
-                <form
-                  className="chat-input-row"
-                  onSubmit={e => {
-                    e.preventDefault();
-                    sendChatMessage(chatInput);
-                    setChatInput('');
-                  }}
-                >
-                  <input
-                    className="chat-input"
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    placeholder="Message..."
-                    maxLength={500}
-                  />
-                  <button type="submit" className="btn-primary chat-send" disabled={!chatInput.trim()}>
-                    Send
-                  </button>
-                </form>
-              </div>
-            ) : (
-              <div className="help-panel" role="tabpanel">
-                <div className="help-list">
-                  <span className="help-item"><span className="sq-sample plain">0</span> Rebirth</span>
-                  <span className="help-item"><span className="sq-sample danger">13</span> House of Netting (Trap)</span>
-                  <span className="help-item"><span className="sq-sample bonus">14</span> Extra Roll: +1 𓋹</span>
-                  <span className="help-item"><span className="sq-sample bonus">25</span> Extra Roll: +1 𓋹</span>
-                  <span className="help-item"><span className="sq-sample danger">26</span> Waters of Chaos (Trap)</span>
-                  <span className="help-item"><span className="sq-sample safe">27-29</span> Safe Squares</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Game Over Overlay */}
+      {/* ── Game over overlay ── */}
       {gameOver && (
-        <div className="game-over-overlay">
-          <div className="game-over-card card">
-            <h2>{gameOver.winner === yourPlayer ? 'Victory!' : 'Defeat'}</h2>
-            <p>
+        <div className="overlay-backdrop">
+          <div className="overlay-card egypt-panel">
+            <h2 className={`egypt-display game-over-title ${gameOver.winner === yourPlayer ? 'game-over-title--win' : 'game-over-title--loss'}`}>
+              {gameOver.winner === yourPlayer ? 'Victory!' : 'Defeat'}
+            </h2>
+            <p className="egypt-muted game-over-reason">
               {gameOver.reason === 'all_pieces_off' && 'All pieces exited the board!'}
               {gameOver.reason === 'resign' &&
                 (gameOver.winner === yourPlayer ? 'Opponent resigned.' : 'You resigned.')}
@@ -535,19 +423,26 @@ export function GameView() {
                   ? 'Opponent auto-resigned due to inactivity.'
                   : 'Auto-resigned due to inactivity.')}
             </p>
-            <div className="game-over-actions">
+            {!isAiGame && rematchOpponentReady && !rematchRequested && !rematchOpponentLeft && (
+              <p className="egypt-muted game-over-reason">{opponentName || 'Opponent'} wants a rematch!</p>
+            )}
+            <div className="overlay-actions">
               {!isAiGame && (
-                <button className="btn-primary" onClick={() => { resetGame(); navigate('/', { state: { autoQueue: true } }); }}>
-                  Play Again
-                </button>
+                rematchOpponentLeft ? (
+                  <ParchmentButton disabled>Opponent Left</ParchmentButton>
+                ) : rematchRequested ? (
+                  <ParchmentButton disabled>Waiting…</ParchmentButton>
+                ) : (
+                  <ParchmentButton onClick={requestRematch}>
+                    {rematchOpponentReady ? 'Accept Rematch' : 'Play Again'}
+                  </ParchmentButton>
+                )
               )}
-              <button className="btn-secondary" onClick={handleBack}>
-                Back to Lobby
-              </button>
+              <EgyptianButton onClick={handleBack}>Back to Lobby</EgyptianButton>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </EgyptianPageShell>
   );
 }

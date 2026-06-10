@@ -1,0 +1,47 @@
+.egypt-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.egypt-tab {
+  background: var(--egypt-panel);
+  border: 1px solid var(--egypt-border-soft);
+  border-radius: var(--egypt-radius-sm);
+  color: var(--egypt-text-muted);
+  padding: 0.35rem 0.75rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+
+.egypt-tab:hover:not(.egypt-tab--active) {
+  color: var(--egypt-text-soft);
+  border-color: var(--egypt-border-soft);
+  background: var(--egypt-panel-soft);
+}
+
+.egypt-tab--active {
+  color: var(--egypt-gold-bright);
+  border-color: var(--egypt-border);
+  background: rgba(216, 169, 58, 0.13);
+}
+
+.egypt-tab {
+  position: relative;
+}
+
+.egypt-tab__dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--egypt-loss);
+  border: 1px solid var(--egypt-bg);
+  box-shadow: 0 0 6px rgba(239, 77, 77, 0.7);
+}

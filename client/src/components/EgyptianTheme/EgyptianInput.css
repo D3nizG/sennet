@@ -1,0 +1,27 @@
+.egypt-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.egypt-input {
+  background: var(--egypt-input-bg);
+  border: 1px solid var(--egypt-border-soft);
+  border-radius: var(--egypt-radius-sm);
+  color: var(--egypt-text-soft);
+  padding: 0.65rem 0.9rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+  width: 100%;
+}
+
+.egypt-input::placeholder {
+  color: var(--egypt-text-muted);
+}
+
+.egypt-input:focus {
+  border-color: var(--egypt-border);
+  box-shadow: 0 0 0 3px rgba(216, 169, 58, 0.13);
+}

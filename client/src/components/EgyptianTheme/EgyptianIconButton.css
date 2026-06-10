@@ -1,0 +1,45 @@
+.egypt-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--egypt-panel);
+  border: 1px solid var(--egypt-border-soft);
+  border-radius: var(--egypt-radius-sm);
+  color: var(--egypt-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.egypt-icon-btn--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+}
+
+.egypt-icon-btn--md {
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
+}
+
+.egypt-icon-btn:hover:not(:disabled) {
+  background: rgba(216, 169, 58, 0.12);
+  color: var(--egypt-text-main);
+  border-color: var(--egypt-border);
+}
+
+.egypt-icon-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 77, 77, 0.14);
+  color: var(--egypt-loss);
+  border-color: rgba(239, 77, 77, 0.45);
+}
+
+.egypt-icon-btn:active:not(:disabled) {
+  opacity: 0.82;
+}
+
+.egypt-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

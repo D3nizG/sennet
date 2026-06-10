@@ -25,6 +25,7 @@ The main gaps are around production auth hardening, client and end-to-end covera
 ├── server/                  # Express 4 + Socket.IO 4 + Prisma backend
 ├── packages/game-engine/    # Shared Senet rules, AI, and event contracts
 ├── .github/workflows/ci.yml
+├── railway.json
 ├── ARCHITECTURE.md
 ├── ROADMAP.md
 ├── RULES.md
@@ -112,10 +113,10 @@ The Vite client proxies `/api` and `/socket.io` to the server in development.
 
 ## Production Hosting
 
-Recommended split:
+Current split:
 
 - frontend on Vercel
-- backend on Render
+- backend on Railway
 - PostgreSQL on Supabase
 
 ### Frontend on Vercel
@@ -132,22 +133,18 @@ Set these values in Vercel:
 
 Required frontend env vars:
 
-- `VITE_API_URL=https://api.your-domain.com/api`
-- `VITE_SOCKET_URL=https://api.your-domain.com`
+- `VITE_API_URL=https://your-railway-service.up.railway.app/api`
+- `VITE_SOCKET_URL=https://your-railway-service.up.railway.app`
 
-### Backend on Render
+### Backend on Railway
 
-Render should also build from the repo root so the server can access the shared workspace package.
+Railway builds from the repo root so the server can access the shared workspace package.
 
-Use the included [`render.yaml`](./render.yaml) blueprint or match these settings manually:
+Use the included [`railway.json`](./railway.json) — it sets the build command, start command (which runs migrations then starts the server), and health check path automatically.
 
-- Build Command: `npm install && npm run build -w @sennet/game-engine && npm run db:generate -w server && npm run build -w server`
-- Start Command: `npm run start -w server`
-- Pre-Deploy Command: `npm run db:migrate:deploy -w server`
-- Health Check Path: `/health`
+Required backend env vars (set in the Railway dashboard):
 
-Required backend env vars:
-
+- `NODE_ENV=production`
 - `DATABASE_URL`
 - `DIRECT_URL`
 - `JWT_SECRET`
@@ -158,9 +155,9 @@ Required backend env vars:
 Recommended domain split:
 
 - `sennet.d3nizg.dev` → Vercel frontend
-- `api.sennet.d3nizg.dev` → Render backend
+- `api.sennet.d3nizg.dev` → Railway backend
 
-The client is now environment-driven for cross-origin deploys, while still falling back to same-origin `/api` and `window.location.origin` for local dev.
+The client is environment-driven for cross-origin deploys, while still falling back to same-origin `/api` and `window.location.origin` for local dev.
 
 ## Test And Build
 

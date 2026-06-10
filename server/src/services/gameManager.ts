@@ -1,11 +1,26 @@
 import { PrismaClient } from '@prisma/client';
 import {
   GameState, PlayerId, Move,
-  initGame, performInitialRoll, applyRoll, applyMove,
+  initGame, applyRoll, applyMove,
   getLegalMoves, BEAR_OFF_POSITION,
 } from '@sennet/game-engine';
 import { secureRoll } from '../utils/rng.js';
 import { logger } from '../utils/logger.js';
+
+// House colors used to break ties when two players prefer the same color.
+const HOUSE_PALETTE = [
+  '#e53e3e', '#dd6b20', '#d69e2e', '#38a169', '#3182ce',
+  '#805ad5', '#00b5d8', '#1a1a1a', '#f0ece3', '#a0aec0',
+];
+
+function sameHex(a: string, b: string): boolean {
+  return (a ?? '').toLowerCase() === (b ?? '').toLowerCase();
+}
+
+function randomDistinctColor(taken: string): string {
+  const options = HOUSE_PALETTE.filter(c => !sameHex(c, taken));
+  return options[Math.floor(Math.random() * options.length)] ?? '#3182ce';
+}
 
 export interface ActiveGame {
   gameId: string;
@@ -40,6 +55,17 @@ export class GameManager {
     const gameId = crypto.randomUUID();
     const state = initGame(gameId);
 
+    // Players' house colors are PREFERENCES — two players can never share one.
+    // If they clash, randomly pick which player keeps their preference and give
+    // the other a distinct random color. (Rematches pass the already-resolved
+    // colors back in, so they stay stable across a session.)
+    let p1Color = p1.houseColor;
+    let p2Color = p2.houseColor;
+    if (sameHex(p1Color, p2Color)) {
+      if (Math.random() < 0.5) p1Color = randomDistinctColor(p2Color);
+      else p2Color = randomDistinctColor(p1Color);
+    }
+
     const dbGame = await this.prisma.game.create({
       data: {
         id: gameId,
@@ -55,8 +81,8 @@ export class GameManager {
       gameId,
       state,
       players: {
-        player1: p1,
-        player2: p2,
+        player1: { ...p1, houseColor: p1Color },
+        player2: { ...p2, houseColor: p2Color },
       },
       isAiGame: isAi,
       aiDifficulty,
@@ -89,27 +115,6 @@ export class GameManager {
     if (game.players.player1.userId === userId) return 'player1';
     if (game.players.player2.userId === userId) return 'player2';
     return null;
-  }
-
-  /** Process the initial roll ceremony (both players roll simultaneously). */
-  doInitialRoll(game: ActiveGame): {
-    state: GameState;
-    p1Roll: number;
-    p2Roll: number;
-    decided: boolean;
-    firstPlayer: PlayerId | null;
-  } {
-    const p1Roll = secureRoll();
-    const p2Roll = secureRoll();
-    game.state = performInitialRoll(game.state, p1Roll, p2Roll);
-
-    return {
-      state: game.state,
-      p1Roll,
-      p2Roll,
-      decided: game.state.initialRolls.decided,
-      firstPlayer: game.state.initialRolls.firstPlayer,
-    };
   }
 
   /** Player rolls the dice. Server generates the value. */

@@ -26,6 +26,8 @@ export interface LobbyUpdatePayload {
 export interface GameStatePayload {
   gameState: GameState;
   yourPlayer: PlayerId;
+  yourColor: string;
+  opponentId: string;
   opponentName: string;
   opponentColor: string;
   isAiGame: boolean;
@@ -96,6 +98,8 @@ export interface ClientToServerEvents {
   LOBBY_JOIN: (data: { lobbyCode: string }) => void;
   LOBBY_INVITE: (data: { friendId: string }) => void;
   LOBBY_START: () => void;
+  LOBBY_CANCEL: () => void;
+  LOBBY_SYNC: () => void;
   GAME_ROLL: () => void;
   GAME_MOVE: (data: { pieceId: string; toSquare: number }) => void;
   GAME_RESIGN: () => void;
@@ -103,6 +107,9 @@ export interface ClientToServerEvents {
   GAME_LEAVE: () => void;
   START_AI_GAME: (data: { difficulty: AIDifficulty }) => void;
   GAME_CHAT: (data: { message: string }) => void;
+  REMATCH_REQUEST: () => void;
+  REMATCH_LEAVE: () => void;
+  LOGOUT: () => void;
 }
 
 // ─── Server → Client Events ─────────────────────────────────────────────────
@@ -110,6 +117,7 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   QUEUE_MATCHED: (data: QueueMatchedPayload) => void;
   LOBBY_UPDATE: (data: LobbyUpdatePayload) => void;
+  LOBBY_CANCELLED: (data: { reason: string }) => void;
   GAME_STATE: (data: GameStatePayload) => void;
   GAME_ROLL_RESULT: (data: GameRollResultPayload) => void;
   GAME_MOVE_APPLIED: (data: GameMoveAppliedPayload) => void;
@@ -120,4 +128,5 @@ export interface ServerToClientEvents {
   FRIENDS_UPDATED: () => void;
   LOBBY_INVITE_RECEIVED: (data: LobbyInvitePayload) => void;
   GAME_CHAT: (data: ChatMessagePayload) => void;
+  REMATCH_UPDATE: (data: { opponentReady?: boolean; opponentLeft?: boolean }) => void;
 }

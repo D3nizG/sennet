@@ -6,10 +6,11 @@ import { config } from '../config.js';
 import { GameManager } from '../services/gameManager.js';
 import { QueueManager } from '../services/queueManager.js';
 import { LobbyManager } from '../services/lobbyManager.js';
+import { RematchManager } from '../services/rematchManager.js';
 import { registerQueueHandlers } from './handlers/queue.js';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
-import { attachSocketServer, registerUserSocket, unregisterUserSocket } from './presence.js';
+import { attachSocketServer, registerUserSocket, unregisterUserSocket, emitToUser } from './presence.js';
 import { TurnRunner } from '../services/turnRunner.js';
 import { getLegalMoves, type ClientToServerEvents, type ServerToClientEvents } from '@sennet/game-engine';
 import { logger } from '../utils/logger.js';
@@ -48,7 +49,8 @@ export function setupSocketIO(
   const gameManager = new GameManager(prisma);
   const queueManager = new QueueManager();
   const lobbyManager = new LobbyManager();
-  const turnRunner  = new TurnRunner(io, gameManager);
+  const rematchManager = new RematchManager();
+  const turnRunner  = new TurnRunner(io, gameManager, {}, rematchManager);
   attachSocketServer(io);
 
   // Authentication middleware
@@ -132,7 +134,7 @@ export function setupSocketIO(
     // Register event handlers
     registerQueueHandlers(socket, io, queueManager, lobbyManager, gameManager, turnRunner, withRateLimit);
     registerLobbyHandlers(socket, io, lobbyManager, queueManager, gameManager, turnRunner, withRateLimit);
-    registerGameHandlers(socket, io, queueManager, lobbyManager, gameManager, turnRunner, withRateLimit);
+    registerGameHandlers(socket, io, queueManager, lobbyManager, gameManager, turnRunner, rematchManager, withRateLimit);
 
     socket.on('disconnect', () => {
       logger.debug({ userId }, '[socket] Disconnected');
@@ -140,6 +142,18 @@ export function setupSocketIO(
       queueManager.leaveBySocket(socket.id);
       lobbyManager.removeUser(userId);
       turnRunner.handleDisconnectForfeit(userId);
+
+      // If the user was on a post-game screen with a pending rematch, the
+      // opponent can no longer rematch — notify them so Play Again greys out.
+      const pending = rematchManager.getByUser(userId);
+      if (pending) {
+        pending.left.add(userId);
+        const opponent = rematchManager.opponentOf(pending, userId);
+        emitToUser(opponent.userId, 'REMATCH_UPDATE', { opponentLeft: true });
+        if (pending.left.has(pending.player1.userId) && pending.left.has(pending.player2.userId)) {
+          rematchManager.remove(pending.gameId);
+        }
+      }
     });
   });
 

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { api, AuthResponse } from '../services/api';
+import { emitLogout } from '../services/socket';
 
 interface User {
   id: string;
@@ -53,11 +54,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [handleAuth]);
 
   const logout = useCallback(() => {
+    // Notify the server while the socket is still connected so it ends any
+    // active game / lobby / queue immediately. The disconnect that follows
+    // (triggered by token → null in SocketContext) happens on a later tick,
+    // giving this emit time to flush.
+    emitLogout();
     setToken(null);
     setUser(null);
     localStorage.removeItem('sennet_token');
     localStorage.removeItem('sennet_user');
   }, []);
+
+  useEffect(() => {
+    const handle = () => logout();
+    window.addEventListener('auth:unauthorized', handle);
+    return () => window.removeEventListener('auth:unauthorized', handle);
+  }, [logout]);
 
   const updateUser = useCallback((data: Partial<User>) => {
     setUser(prev => {

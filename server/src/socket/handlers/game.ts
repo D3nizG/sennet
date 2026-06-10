@@ -6,6 +6,8 @@ import { GameManager } from '../../services/gameManager.js';
 import { TurnRunner } from '../../services/turnRunner.js';
 import { GameMoveSchema, StartAIGameSchema, GameChatSchema } from '../events.js';
 import { getLegalMoves, PlayerId } from '@sennet/game-engine';
+import { getUserSocketId, emitToUser } from '../presence.js';
+import { RematchManager } from '../../services/rematchManager.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerGameHandlers(
@@ -15,6 +17,7 @@ export function registerGameHandlers(
   lobbyManager: LobbyManager,
   gameManager: GameManager,
   turnRunner: TurnRunner,
+  rematchManager: RematchManager,
   withRateLimit: (fn: (...args: any[]) => void) => (...args: any[]) => void,
 ): void {
   const userId = socket.data.user.userId;
@@ -62,6 +65,8 @@ export function registerGameHandlers(
 
   // ── Leave (client explicitly leaves/resets after game over) ──────────
   socket.on('GAME_LEAVE', withRateLimit(() => {
+    notifyRematchLeave();
+
     const game = gameManager.getByUser(userId);
     if (!game) return;
 
@@ -69,6 +74,82 @@ export function registerGameHandlers(
       logger.debug({ userId, gameId: game.gameId }, '[GAME_LEAVE] User left finished game');
       socket.leave(game.gameId);
       gameManager.clearUserMapping(userId);
+    }
+  }));
+
+  // ── Rematch: leaving the post-game screen ────────────────────────────
+  function notifyRematchLeave(): void {
+    const pending = rematchManager.getByUser(userId);
+    if (!pending) return;
+    pending.left.add(userId);
+    const opponent = rematchManager.opponentOf(pending, userId);
+    emitToUser(opponent.userId, 'REMATCH_UPDATE', { opponentLeft: true });
+    if (pending.left.has(pending.player1.userId) && pending.left.has(pending.player2.userId)) {
+      rematchManager.remove(pending.gameId);
+    }
+  }
+
+  socket.on('REMATCH_LEAVE', withRateLimit(() => {
+    notifyRematchLeave();
+  }));
+
+  // ── Rematch: request to play the same opponent again ─────────────────
+  socket.on('REMATCH_REQUEST', withRateLimit(async () => {
+    const pending = rematchManager.getByUser(userId);
+    if (!pending) {
+      socket.emit('GAME_ERROR', { code: 'NO_REMATCH', message: 'No rematch available' });
+      return;
+    }
+
+    const opponent = rematchManager.opponentOf(pending, userId);
+    if (pending.left.has(opponent.userId)) {
+      socket.emit('REMATCH_UPDATE', { opponentLeft: true });
+      return;
+    }
+
+    pending.ready.add(userId);
+    emitToUser(opponent.userId, 'REMATCH_UPDATE', { opponentReady: true });
+
+    if (!rematchManager.bothReady(pending)) return;
+
+    // Both players want a rematch — spin up a fresh game with the same two
+    // players, reusing their existing sockets (no trip back to the lobby).
+    const s1 = getUserSocketId(pending.player1.userId);
+    const s2 = getUserSocketId(pending.player2.userId);
+    if (!s1 || !s2) {
+      socket.emit('REMATCH_UPDATE', { opponentLeft: true });
+      return;
+    }
+
+    rematchManager.remove(pending.gameId);
+
+    try {
+      const game = await gameManager.createGame(
+        { userId: pending.player1.userId, socketId: s1, displayName: pending.player1.displayName, houseColor: pending.player1.houseColor },
+        { userId: pending.player2.userId, socketId: s2, displayName: pending.player2.displayName, houseColor: pending.player2.houseColor },
+      );
+
+      const sock1 = io.sockets.sockets.get(s1);
+      const sock2 = io.sockets.sockets.get(s2);
+      sock1?.join(game.gameId);
+      sock2?.join(game.gameId);
+
+      sock1?.emit('QUEUE_MATCHED', {
+        gameId: game.gameId,
+        opponent: { id: pending.player2.userId, displayName: pending.player2.displayName, houseColor: game.players.player2.houseColor },
+        yourPlayer: 'player1' as PlayerId,
+      });
+      sock2?.emit('QUEUE_MATCHED', {
+        gameId: game.gameId,
+        opponent: { id: pending.player1.userId, displayName: pending.player1.displayName, houseColor: game.players.player1.houseColor },
+        yourPlayer: 'player2' as PlayerId,
+      });
+
+      turnRunner.startFaceoff(game.gameId);
+      logger.debug({ gameId: game.gameId, p1: pending.player1.userId, p2: pending.player2.userId }, '[REMATCH] New game started');
+    } catch (err) {
+      logger.error({ err }, '[REMATCH] Failed to start rematch');
+      socket.emit('GAME_ERROR', { code: 'REMATCH_ERROR', message: 'Failed to start rematch' });
     }
   }));
 
@@ -170,6 +251,16 @@ export function registerGameHandlers(
     if (!result.ok) {
       socket.emit('GAME_ERROR', { code: result.code, message: result.message });
     }
+  }));
+
+  // ── Logout (client signs out) — end everything immediately ───────────────
+  socket.on('LOGOUT', withRateLimit(() => {
+    logger.debug({ userId }, '[LOGOUT] Tearing down session state');
+    queueManager.leave(userId);
+    queueManager.leaveBySocket(socket.id);
+    lobbyManager.removeUser(userId);
+    // Forfeit any active game now (no 15s grace period)
+    turnRunner.handleDisconnectForfeit(userId, true);
   }));
 
   // ── Chat ────────────────────────────────────────────────────────────────

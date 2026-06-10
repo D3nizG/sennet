@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
@@ -9,11 +9,18 @@ import type {
   LobbyInvitePayload,
   AIDifficulty,
 } from '@sennet/game-engine';
+import {
+  EgyptianPanel,
+  ParchmentButton,
+  EgyptianButton,
+  EgyptianIconButton,
+  EgyptianInput,
+  MedallionIcon,
+} from '../EgyptianTheme';
 import './LobbyView.css';
 
 export function LobbyView() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { socket, connected } = useSocket();
   const { inGame } = useGame();
   const { user } = useAuth();
@@ -28,6 +35,7 @@ export function LobbyView() {
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium');
   const [error, setError] = useState('');
   const [invite, setInvite] = useState<LobbyInvitePayload | null>(null);
+  const [friendsOpen, setFriendsOpen] = useState(false);
 
   const loadFriends = useCallback(async () => {
     try {
@@ -42,63 +50,53 @@ export function LobbyView() {
     }
   }, []);
 
-  // Navigate to /game when GameProvider sets inGame (via QUEUE_MATCHED)
   useEffect(() => {
     if (inGame && !hasNavigated.current) {
       hasNavigated.current = true;
-      console.log('[LobbyView] inGame=true → navigating to /game'); // TODO: remove
       navigate('/game');
     }
   }, [inGame, navigate]);
 
-  // Auto-queue when navigated from "Play Again"
-  useEffect(() => {
-    const state = location.state as { autoQueue?: boolean } | null;
-    if (state?.autoQueue && connected && socket) {
-      socket.emit('QUEUE_JOIN');
-      setQueuing(true);
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, connected, socket, navigate, location.pathname]);
-
-  // Load friends
   useEffect(() => {
     void loadFriends();
   }, [loadFriends]);
 
-  // Socket event listeners (lobby-specific only; game events handled by GameProvider)
   useEffect(() => {
     if (!socket) return;
 
-    const onLobbyUpdate = (data: LobbyUpdatePayload) => {
-      setLobby(data);
+    const onLobbyUpdate = (data: LobbyUpdatePayload) => setLobby(data);
+    const onLobbyCancelled = (data: { reason: string }) => {
+      setLobby(null);
+      setError(data.reason || 'Lobby was cancelled');
+      setTimeout(() => setError(''), 4000);
     };
-
-    const onInvite = (data: LobbyInvitePayload) => {
-      setInvite(data);
-    };
-
-    const onFriendsUpdated = () => {
-      void loadFriends();
-    };
-
+    const onInvite = (data: LobbyInvitePayload) => setInvite(data);
+    const onFriendsUpdated = () => { void loadFriends(); };
     const onError = (data: { code: string; message: string }) => {
       setError(data.message);
       setTimeout(() => setError(''), 4000);
     };
 
     socket.on('LOBBY_UPDATE', onLobbyUpdate);
+    socket.on('LOBBY_CANCELLED', onLobbyCancelled);
     socket.on('LOBBY_INVITE_RECEIVED', onInvite);
     socket.on('FRIENDS_UPDATED', onFriendsUpdated);
     socket.on('GAME_ERROR', onError);
 
     return () => {
       socket.off('LOBBY_UPDATE', onLobbyUpdate);
+      socket.off('LOBBY_CANCELLED', onLobbyCancelled);
       socket.off('LOBBY_INVITE_RECEIVED', onInvite);
       socket.off('FRIENDS_UPDATED', onFriendsUpdated);
       socket.off('GAME_ERROR', onError);
     };
   }, [socket, loadFriends]);
+
+  // Restore any in-progress private lobby after navigating back to the lobby
+  // (the socket persists across SPA navigation, but local lobby state is lost).
+  useEffect(() => {
+    if (connected && socket) socket.emit('LOBBY_SYNC');
+  }, [connected, socket]);
 
   const handleQuickMatch = useCallback(() => {
     if (queuing) {
@@ -123,6 +121,15 @@ export function LobbyView() {
   const handleStartLobby = useCallback(() => {
     socket?.emit('LOBBY_START');
   }, [socket]);
+
+  const handleCancelLobby = useCallback(() => {
+    socket?.emit('LOBBY_CANCEL');
+    setLobby(null);
+  }, [socket]);
+
+  const handleViewFriendProfile = useCallback((friendId: string) => {
+    navigate(`/profile/${friendId}`);
+  }, [navigate]);
 
   const handleInviteFriend = useCallback((friendId: string) => {
     socket?.emit('LOBBY_INVITE', { friendId });
@@ -169,168 +176,278 @@ export function LobbyView() {
   }, [loadFriends]);
 
   const handleInviteFriendToGame = useCallback((friendId: string) => {
-    if (!lobby) {
-      socket?.emit('LOBBY_CREATE');
-    }
+    if (!lobby) socket?.emit('LOBBY_CREATE');
     socket?.emit('LOBBY_INVITE', { friendId });
   }, [socket, lobby]);
 
   return (
     <div className="lobby-view">
-      {error && <div className="error-toast">{error}</div>}
+      {error && <div className="lobby-error-toast">{error}</div>}
 
-      {/* Invite notification */}
       {invite && (
-        <div className="invite-banner card">
-          <p><strong>{invite.fromUsername}</strong> invited you to play!</p>
-          <div className="invite-actions">
-            <button className="btn-primary" onClick={handleAcceptInvite}>Join</button>
-            <button className="btn-secondary" onClick={() => setInvite(null)}>Dismiss</button>
-          </div>
+        <div className="lobby-invite-banner">
+          <EgyptianPanel ornament className="lobby-invite-panel">
+            <p className="lobby-invite-text egypt-body">
+              <span className="egypt-display">{invite.fromUsername}</span> invites you to play!
+            </p>
+            <div className="lobby-invite-actions">
+              <ParchmentButton onClick={handleAcceptInvite}>Join Game</ParchmentButton>
+              <EgyptianButton onClick={() => setInvite(null)}>Dismiss</EgyptianButton>
+            </div>
+          </EgyptianPanel>
         </div>
       )}
 
-      <div className="lobby-grid">
-        {/* Quick Match */}
-        <div className="card lobby-section">
-          <h2>Quick Match</h2>
-          <p className="section-desc">Find an opponent automatically</p>
-          <button
-            className={queuing ? 'btn-danger' : 'btn-primary'}
-            onClick={handleQuickMatch}
-            disabled={!connected}
-          >
-            {queuing ? 'Cancel Search...' : 'Find Match'}
-          </button>
-          {queuing && <p className="searching">Searching for opponent...</p>}
-        </div>
+      <EgyptianPanel ornament className="lobby-frame">
+        <span className="lobby-corner lobby-corner--tl" aria-hidden="true" />
+        <span className="lobby-corner lobby-corner--tr" aria-hidden="true" />
+        <span className="lobby-corner lobby-corner--bl" aria-hidden="true" />
+        <span className="lobby-corner lobby-corner--br" aria-hidden="true" />
+        <div className="lobby-compartments">
 
-        {/* AI Game */}
-        <div className="card lobby-section">
-          <h2>vs Pharaoh AI</h2>
-          <p className="section-desc">Practice against the computer</p>
-          <div className="ai-options">
-            {(['easy', 'medium', 'hard'] as AIDifficulty[]).map(d => (
-              <button
-                key={d}
-                className={`btn-secondary ${aiDifficulty === d ? 'active' : ''}`}
-                onClick={() => setAiDifficulty(d)}
-              >
-                {d.charAt(0).toUpperCase() + d.slice(1)}
-              </button>
-            ))}
-          </div>
-          <button className="btn-primary" onClick={handleStartAI} disabled={!connected}>
-            Play AI ({aiDifficulty})
-          </button>
-        </div>
-
-        {/* Private Lobby */}
-        <div className="card lobby-section">
-          <h2>Private Match</h2>
-          {lobby ? (
-            <div className="lobby-info">
-              <p>Lobby Code:</p>
-              <div className="lobby-code">{lobby.lobbyCode}</div>
-              <p className="lobby-status">
-                {lobby.guestName
-                  ? `${lobby.guestName} joined!`
-                  : 'Waiting for opponent...'}
-              </p>
-              {lobby.guestId && lobby.hostId === user?.id && (
-                <button className="btn-primary" onClick={handleStartLobby}>Start Game</button>
-              )}
-              {friends.length > 0 && !lobby.guestId && (
-                <div className="invite-friends">
-                  <p className="small">Invite a friend:</p>
-                  {friends.map((f: any) => (
-                    <button
-                      key={f.id}
-                      className="btn-secondary friend-invite-btn"
-                      onClick={() => handleInviteFriend(f.id)}
-                    >
-                      {f.displayName}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="lobby-actions">
-              <button className="btn-primary" onClick={handleCreateLobby} disabled={!connected}>
-                Create Lobby
-              </button>
-              <div className="join-group">
-                <input
-                  value={joinCode}
-                  onChange={e => setJoinCode(e.target.value)}
-                  placeholder="Enter code"
-                  maxLength={10}
-                />
-                <button className="btn-secondary" onClick={handleJoinLobby} disabled={!connected || !joinCode}>
-                  Join
-                </button>
+          {/* ── Quick Match ── */}
+          <div className="lobby-compartment">
+            <div className="lobby-sec-header">
+              <MedallionIcon size="lg">⚔</MedallionIcon>
+              <div className="lobby-sec-title-wrap">
+                <h2 className="egypt-display lobby-sec-title">Quick Match</h2>
+                <div className="gold-divider" />
               </div>
             </div>
-          )}
+            <p className="egypt-body lobby-desc">Find an opponent automatically.</p>
+            <div className="lobby-sec-footer">
+              {queuing ? (
+                <>
+                  <p className="lobby-searching">Searching for opponent…</p>
+                  <EgyptianButton fullWidth onClick={handleQuickMatch} className="lobby-cancel-btn">
+                    Cancel Search
+                  </EgyptianButton>
+                </>
+              ) : (
+                <ParchmentButton fullWidth onClick={handleQuickMatch} disabled={!connected}>
+                  Find Match
+                </ParchmentButton>
+              )}
+            </div>
+          </div>
+
+          {/* ── Vs Pharaoh AI ── */}
+          <div className="lobby-compartment">
+            <div className="lobby-sec-header">
+              <MedallionIcon size="lg">𓂀</MedallionIcon>
+              <div className="lobby-sec-title-wrap">
+                <h2 className="egypt-display lobby-sec-title">Vs Pharaoh AI</h2>
+                <div className="gold-divider" />
+              </div>
+            </div>
+            <p className="egypt-body lobby-desc">Practice against the computer.</p>
+            <div className="lobby-difficulty">
+              {(['easy', 'medium', 'hard'] as AIDifficulty[]).map(d => (
+                <EgyptianButton
+                  key={d}
+                  className={aiDifficulty === d ? 'lobby-diff-btn lobby-diff-btn--active' : 'lobby-diff-btn'}
+                  onClick={() => setAiDifficulty(d)}
+                >
+                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                </EgyptianButton>
+              ))}
+            </div>
+            <div className="lobby-sec-footer">
+              <ParchmentButton fullWidth onClick={handleStartAI} disabled={!connected}>
+                Play AI
+              </ParchmentButton>
+            </div>
+          </div>
+
+          {/* ── Private Match ── */}
+          <div className="lobby-compartment">
+            <div className="lobby-sec-header">
+              <MedallionIcon size="lg">𓋹</MedallionIcon>
+              <div className="lobby-sec-title-wrap">
+                <h2 className="egypt-display lobby-sec-title">Private Match</h2>
+                <div className="gold-divider" />
+              </div>
+            </div>
+            <p className="egypt-body lobby-desc">Create a lobby and invite others.</p>
+
+            {lobby ? (
+              <div className="lobby-private-info">
+                <p className="egypt-label">Lobby Code</p>
+                <div className="lobby-code egypt-display">{lobby.lobbyCode}</div>
+                <p className="lobby-status egypt-muted">
+                  {lobby.guestName ? `${lobby.guestName} has joined!` : 'Waiting for opponent…'}
+                </p>
+                {lobby.guestId && lobby.hostId === user?.id && (
+                  <ParchmentButton fullWidth onClick={handleStartLobby}>
+                    Start Game
+                  </ParchmentButton>
+                )}
+                <EgyptianButton fullWidth className="lobby-cancel-btn" onClick={handleCancelLobby}>
+                  Cancel Lobby
+                </EgyptianButton>
+                {friends.length > 0 && !lobby.guestId && (
+                  <div className="lobby-invite-friends">
+                    <p className="egypt-label lobby-invite-label">Invite a Friend</p>
+                    <div className="lobby-friend-invite-list">
+                      {friends.map((f: any) => (
+                        <EgyptianButton
+                          key={f.id}
+                          className="lobby-friend-invite-btn"
+                          onClick={() => handleInviteFriend(f.id)}
+                        >
+                          {f.displayName}
+                        </EgyptianButton>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="lobby-private-actions">
+                <ParchmentButton fullWidth onClick={handleCreateLobby} disabled={!connected}>
+                  Create Lobby
+                </ParchmentButton>
+                <div className="lobby-join-group">
+                  <EgyptianInput
+                    value={joinCode}
+                    onChange={e => setJoinCode(e.target.value)}
+                    placeholder="Enter lobby code"
+                    maxLength={10}
+                    className="lobby-code-input"
+                  />
+                  <EgyptianButton
+                    onClick={handleJoinLobby}
+                    disabled={!connected || !joinCode}
+                    className="lobby-join-btn"
+                  >
+                    Join
+                  </EgyptianButton>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </EgyptianPanel>
+
+      {!connected && (
+        <p className="lobby-connection-status egypt-muted">Connecting to server…</p>
+      )}
+
+      {/* ── Friends toggle tab ── */}
+      <button
+        className="lobby-friends-tab"
+        onClick={() => setFriendsOpen(o => !o)}
+        aria-label="Toggle friends panel"
+      >
+        <span className="lobby-friends-tab__icon">𓁹</span>
+        <span className="lobby-friends-tab__label">Friends</span>
+        {pendingRequests.length > 0 && (
+          <span className="lobby-friends-tab__badge">{pendingRequests.length}</span>
+        )}
+      </button>
+
+      {/* ── Friends slide-in drawer ── */}
+      {friendsOpen && (
+        <div className="lobby-friends-overlay" onClick={() => setFriendsOpen(false)} />
+      )}
+      <aside className={`lobby-friends-drawer${friendsOpen ? ' lobby-friends-drawer--open' : ''}`}>
+        <div className="lobby-friends-drawer__header">
+          <h2 className="egypt-display lobby-friends-drawer__title">Friends</h2>
+          <EgyptianIconButton size="sm" title="Close" onClick={() => setFriendsOpen(false)}>
+            ✕
+          </EgyptianIconButton>
         </div>
 
-        {/* Friends */}
-        <div className="card lobby-section">
-          <h2>Friends</h2>
-          <div className="add-friend-group">
-            <input
+        <div className="lobby-friends-drawer__body">
+          <div className="lobby-add-friend">
+            <EgyptianInput
               value={friendUsername}
               onChange={e => setFriendUsername(e.target.value)}
               placeholder="Username to add"
             />
-            <button className="btn-secondary" onClick={handleAddFriend} disabled={!friendUsername.trim()}>
+            <EgyptianButton
+              onClick={handleAddFriend}
+              disabled={!friendUsername.trim()}
+              className="lobby-add-btn"
+            >
               Add
-            </button>
+            </EgyptianButton>
           </div>
 
           {pendingRequests.length > 0 && (
-            <div className="pending-requests">
-              <h4>Pending Requests</h4>
+            <div className="lobby-pending">
+              <p className="egypt-label lobby-pending-label">Pending Requests</p>
               {pendingRequests.map((r: any) => (
-                <div key={r.friendshipId} className="pending-item">
-                  <span>{r.from.displayName}</span>
-                  <button className="btn-primary small" onClick={() => handleRespondFriend(r.friendshipId, true)}>Accept</button>
-                  <button className="btn-secondary small" onClick={() => handleRespondFriend(r.friendshipId, false)}>Reject</button>
+                <div key={r.friendshipId} className="lobby-pending-item">
+                  <span className="egypt-body lobby-pending-name">{r.from.displayName}</span>
+                  <div className="lobby-pending-actions">
+                    <EgyptianIconButton
+                      size="sm"
+                      title="Accept"
+                      onClick={() => handleRespondFriend(r.friendshipId, true)}
+                    >
+                      ✓
+                    </EgyptianIconButton>
+                    <EgyptianIconButton
+                      size="sm"
+                      danger
+                      title="Reject"
+                      onClick={() => handleRespondFriend(r.friendshipId, false)}
+                    >
+                      ✕
+                    </EgyptianIconButton>
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
           {friends.length > 0 ? (
-            <ul className="friend-list">
+            <ul className="lobby-friend-list egypt-scrollbar">
               {friends.map((f: any) => (
-                <li key={f.friendshipId ?? f.id} className="friend-item">
-                  <span className="friend-name">{f.displayName} <span className="friend-tag">@{f.username}</span></span>
-                  <div className="friend-actions">
-                    <button
-                      className="btn-icon"
+                <li key={f.friendshipId ?? f.id} className="lobby-friend-item">
+                  <MedallionIcon size="sm" className="lobby-friend-avatar">
+                    {f.displayName?.[0]?.toUpperCase() ?? '?'}
+                  </MedallionIcon>
+                  <div className="lobby-friend-info">
+                    <span className="egypt-body lobby-friend-name">{f.displayName}</span>
+                    <span className="egypt-muted">@{f.username}</span>
+                  </div>
+                  <div className="lobby-friend-btns">
+                    <EgyptianIconButton
+                      size="sm"
+                      title="View profile"
+                      onClick={() => handleViewFriendProfile(f.id)}
+                    >
+                      𓂀
+                    </EgyptianIconButton>
+                    <EgyptianIconButton
+                      size="sm"
                       title="Invite to game"
                       onClick={() => handleInviteFriendToGame(f.id)}
-                    >+</button>
-                    <button
-                      className="btn-icon btn-icon-danger"
+                    >
+                      ⚔
+                    </EgyptianIconButton>
+                    <EgyptianIconButton
+                      size="sm"
+                      danger
                       title="Remove friend"
                       onClick={() => handleRemoveFriend(f.friendshipId ?? f.id)}
-                    >🗑</button>
+                    >
+                      ✕
+                    </EgyptianIconButton>
                   </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="no-friends">No friends yet — add someone!</p>
+            <p className="egypt-muted lobby-no-friends">
+              No companions yet — send an invitation!
+            </p>
           )}
         </div>
-      </div>
-
-      {!connected && (
-        <div className="connection-status">Connecting to server...</div>
-      )}
+      </aside>
     </div>
   );
 }

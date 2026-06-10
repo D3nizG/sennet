@@ -101,6 +101,52 @@ export function registerLobbyHandlers(
     }
   }));
 
+  socket.on('LOBBY_CANCEL', withRateLimit(() => {
+    const lobby = lobbyManager.getByUser(userId);
+    if (!lobby) return;
+
+    if (lobby.host.userId === userId) {
+      // Host cancels — tear down the lobby and notify everyone in the room
+      io.to(`lobby:${lobby.id}`).emit('LOBBY_CANCELLED', { reason: 'Host cancelled the lobby' });
+      const s1 = io.sockets.sockets.get(lobby.host.socketId);
+      const s2 = lobby.guest ? io.sockets.sockets.get(lobby.guest.socketId) : null;
+      s1?.leave(`lobby:${lobby.id}`);
+      s2?.leave(`lobby:${lobby.id}`);
+      lobbyManager.removeLobby(lobby.id);
+      logger.debug({ userId, lobbyId: lobby.id }, '[LOBBY_CANCEL] Host cancelled');
+    } else if (lobby.guest?.userId === userId) {
+      // Guest leaves — lobby reverts to waiting for a new guest
+      socket.leave(`lobby:${lobby.id}`);
+      lobbyManager.removeUser(userId);
+      io.to(`lobby:${lobby.id}`).emit('LOBBY_UPDATE', {
+        lobbyId: lobby.id,
+        lobbyCode: lobby.code,
+        hostId: lobby.host.userId,
+        hostName: lobby.host.displayName,
+        status: lobby.status,
+      });
+      logger.debug({ userId, lobbyId: lobby.id }, '[LOBBY_CANCEL] Guest left');
+    }
+  }));
+
+  socket.on('LOBBY_SYNC', withRateLimit(() => {
+    // Restore lobby state for a client that navigated away and back (socket persisted)
+    const lobby = lobbyManager.getByUser(userId);
+    if (!lobby) return;
+
+    // Ensure the socket is (re)joined to the lobby room
+    socket.join(`lobby:${lobby.id}`);
+    socket.emit('LOBBY_UPDATE', {
+      lobbyId: lobby.id,
+      lobbyCode: lobby.code,
+      hostId: lobby.host.userId,
+      hostName: lobby.host.displayName,
+      guestId: lobby.guest?.userId,
+      guestName: lobby.guest?.displayName,
+      status: lobby.status,
+    });
+  }));
+
   socket.on('LOBBY_START', withRateLimit(async () => {
     const lobby = lobbyManager.getByUser(userId);
     if (!lobby || lobby.host.userId !== userId) {
@@ -134,7 +180,7 @@ export function registerLobbyHandlers(
         opponent: {
           id: lobby.guest.userId,
           displayName: lobby.guest.displayName,
-          houseColor: lobby.guest.houseColor,
+          houseColor: game.players.player2.houseColor,
         },
         yourPlayer: 'player1' as PlayerId,
       });
@@ -143,7 +189,7 @@ export function registerLobbyHandlers(
         opponent: {
           id: lobby.host.userId,
           displayName: lobby.host.displayName,
-          houseColor: lobby.host.houseColor,
+          houseColor: game.players.player1.houseColor,
         },
         yourPlayer: 'player2' as PlayerId,
       });

@@ -13,8 +13,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+
+  let data: any;
+  try {
+    data = await res.json();
+  } catch {
+    if (!res.ok) {
+      if (res.status === 401) window.dispatchEvent(new Event('auth:unauthorized'));
+      throw new Error(`Server error (${res.status})`);
+    }
+    throw new Error('Unexpected server response');
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new Event('auth:unauthorized'));
+    throw new Error(data?.error || `Request failed (${res.status})`);
+  }
   return data as T;
 }
 
@@ -38,6 +52,9 @@ export const api = {
     }),
 
   getProfile: () => request<any>('/profile/me'),
+
+  // Public profile of another user (opponent / friend) — safe fields only.
+  getUserById: (id: string) => request<any>(`/users/${id}`),
 
   updateProfile: (data: { displayName?: string; houseColor?: string }) =>
     request<any>('/profile/me', { method: 'PATCH', body: JSON.stringify(data) }),

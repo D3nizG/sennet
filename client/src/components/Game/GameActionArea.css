@@ -1,0 +1,192 @@
+/* ── Game Action Area ─────────────────────────────────────────────────────── */
+
+.game-action-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0.6rem 1.5rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  min-height: 88px;
+  width: min(860px, 90vw);
+}
+
+/* ── Bonus rolls ───────────────────────────────────────────────────────────── */
+
+.action-bonus {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 56px;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--egypt-radius-sm);
+  background: var(--egypt-panel-deep);
+  border: 1px solid var(--egypt-border-soft);
+}
+
+.bonus-icon {
+  font-size: 1rem;
+  color: var(--egypt-gold);
+}
+
+.bonus-count {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--egypt-gold-bright);
+}
+
+/* ── Dice group ────────────────────────────────────────────────────────────── */
+
+.action-dice-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dice-display {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--egypt-radius-sm);
+  background: var(--egypt-panel-deep);
+  border: 1px solid var(--egypt-border);
+  box-shadow: var(--egypt-shadow-gold);
+}
+
+.dice-display--empty {
+  border-color: var(--egypt-border-soft);
+  box-shadow: none;
+}
+
+.dice-display--rolling {
+  border-color: var(--egypt-gold);
+  box-shadow: 0 0 16px rgba(216, 169, 58, 0.35);
+}
+
+.dice-face {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--egypt-gold-bright);
+  transition: color 0.08s ease;
+}
+
+.dice-face--empty {
+  color: var(--egypt-text-muted);
+  font-size: 1.4rem;
+}
+
+.dice-face--rolling {
+  color: var(--egypt-gold);
+  animation: dice-spin 0.08s steps(1) infinite;
+}
+
+@keyframes dice-spin {
+  0%  { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.action-roll-label {
+  font-size: 0.78rem;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+/* ── Roll button ───────────────────────────────────────────────────────────── */
+
+.action-btn-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.action-roll-btn {
+  padding: 0.6rem 2rem !important;
+  font-size: 1rem !important;
+}
+
+.action-roll-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.action-bearoff-btn {
+  padding: 0.35rem 1.2rem;
+  background: rgba(56, 210, 122, 0.15);
+  border: 2px dashed rgba(56, 210, 122, 0.7);
+  border-radius: var(--egypt-radius-sm);
+  color: #38d27a;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.action-bearoff-btn:hover {
+  background: rgba(56, 210, 122, 0.28);
+}
+
+/* ── Status line ───────────────────────────────────────────────────────────── */
+
+.action-status {
+  min-width: 180px;
+  text-align: center;
+}
+
+.action-hint {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--egypt-gold-muted);
+}
+
+.action-event-notice {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--egypt-radius-sm);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.action-event-notice--blocked,
+.action-event-notice--trap {
+  background: rgba(230, 126, 34, 0.15);
+  color: #e67e22;
+  border: 1px solid rgba(230, 126, 34, 0.35);
+}
+
+.action-event-notice--good {
+  background: rgba(56, 210, 122, 0.15);
+  color: #38d27a;
+  border: 1px solid rgba(56, 210, 122, 0.35);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .game-action-area {
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 72px;
+  }
+
+  .action-roll-label {
+    display: none;
+  }
+
+  .action-status {
+    display: none;
+  }
+
+  .dice-display {
+    width: 44px;
+    height: 44px;
+  }
+
+  .dice-face {
+    font-size: 1.6rem;
+  }
+}
