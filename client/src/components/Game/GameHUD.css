@@ -1,0 +1,217 @@
+/* ── Game HUD ─────────────────────────────────────────────────────────────── */
+
+.game-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: var(--egypt-panel-deep);
+  border-bottom: 1px solid var(--egypt-border-soft);
+  min-height: 72px;
+  flex-shrink: 0;
+}
+
+/* ── Player Status ─────────────────────────────────────────────────────────── */
+
+.hud-player {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  max-width: 240px;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--egypt-radius-sm);
+  border: 1px solid transparent;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.hud-player--right {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.hud-player--active {
+  border-color: var(--egypt-border-soft);
+  box-shadow: 0 0 16px rgba(216, 169, 58, 0.2);
+  background: rgba(216, 169, 58, 0.06);
+}
+
+/* Clickable player card (your own card — links to profile) */
+button.hud-player--clickable {
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+button.hud-player--clickable:hover {
+  border-color: var(--egypt-border);
+  background: rgba(216, 169, 58, 0.08);
+}
+
+button.hud-player--clickable:focus-visible {
+  outline: 2px solid var(--egypt-gold);
+  outline-offset: 2px;
+}
+
+/* Avatar medallion */
+.hud-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    color-mix(in srgb, var(--avatar-color, var(--egypt-gold)) 80%, white 20%),
+    var(--avatar-color, var(--egypt-gold))
+  );
+  border: 2px solid var(--egypt-border);
+  box-shadow: 0 0 10px rgba(216, 169, 58, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-player--active .hud-avatar {
+  box-shadow: 0 0 0 2px var(--egypt-gold), 0 0 14px rgba(216, 169, 58, 0.45);
+}
+
+.hud-avatar__initial {
+  color: rgba(255, 255, 255, 0.92);
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Player info (name + pips) */
+.hud-player__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.hud-player__name {
+  color: var(--egypt-text-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.hud-player--active .hud-player__name {
+  color: var(--egypt-gold-bright);
+}
+
+/* Borne-off pips */
+.hud-borne-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.hud-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--pip-color, var(--egypt-gold));
+  background: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.hud-pip--filled {
+  background: var(--pip-color, var(--egypt-gold));
+}
+
+/* ── Turn Banner ───────────────────────────────────────────────────────────── */
+
+.hud-turn-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--egypt-border-soft);
+  background: rgba(5, 11, 22, 0.6);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hud-turn-banner__ornament {
+  font-size: 0.85rem;
+  opacity: 0.55;
+  color: var(--egypt-gold-muted);
+}
+
+.hud-turn-banner__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--egypt-text-muted);
+}
+
+.hud-turn-banner--yours {
+  border-color: var(--egypt-gold);
+  background: rgba(216, 169, 58, 0.12);
+  box-shadow: 0 0 14px rgba(216, 169, 58, 0.18);
+}
+
+.hud-turn-banner--yours .hud-turn-banner__label {
+  color: var(--egypt-gold-bright);
+}
+
+.hud-turn-banner--yours .hud-turn-banner__ornament {
+  opacity: 0.85;
+  color: var(--egypt-gold);
+}
+
+.hud-turn-banner--theirs .hud-turn-banner__label {
+  color: var(--egypt-text-muted);
+}
+
+.hud-turn-banner--over .hud-turn-banner__label {
+  color: var(--egypt-loss);
+}
+
+.hud-turn-banner--faceoff .hud-turn-banner__label {
+  color: var(--egypt-gold-bright);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .game-hud {
+    padding: 0.4rem 0.75rem;
+    min-height: 60px;
+  }
+
+  .hud-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .hud-avatar__initial {
+    font-size: 0.85rem;
+  }
+
+  .hud-player__name {
+    font-size: 0.75rem;
+    max-width: 80px;
+  }
+
+  .hud-turn-banner {
+    padding: 0.3rem 0.6rem;
+    gap: 0.3rem;
+  }
+
+  .hud-turn-banner__ornament {
+    display: none;
+  }
+
+  .hud-turn-banner__label {
+    font-size: 0.65rem;
+  }
+}
