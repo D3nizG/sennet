@@ -74,6 +74,11 @@
   left: clamp(-30px, -2.4vw, -18px);
 }
 
+/* Mirror the ⤵ glyph into a curved "left → down" turn (keeps translateY centring). */
+.sennet-board-turn.sennet-board-turn--flip-x {
+  transform: translateY(-50%) scaleX(-1);
+}
+
 /* ── Cell ────────────────────────────────────────────────────────────────── */
 
 .sennet-board-cell {

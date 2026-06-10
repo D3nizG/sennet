@@ -64,7 +64,13 @@ export function BoardGrid({
           {BOARD_ROW_TURN_MARKERS[rowIndex].map((marker) => (
             <span
               key={marker.side}
-              className={`sennet-board-turn sennet-board-turn--${marker.side}`}
+              className={[
+                'sennet-board-turn',
+                `sennet-board-turn--${marker.side}`,
+                marker.flipX && 'sennet-board-turn--flip-x',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               aria-hidden="true"
               title={marker.label}
             >

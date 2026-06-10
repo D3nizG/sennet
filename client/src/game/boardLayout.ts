@@ -54,16 +54,20 @@ export interface RowTurnMarker {
   side: 'left' | 'right';
   glyph: string;
   label: string;
+  /** Mirror the glyph horizontally. Unicode has no curved "left → down" arrow,
+   *  so cell 20 reuses the same ⤵ glyph as cell 10, flipped, for a matching
+   *  weight and curve. */
+  flipX?: boolean;
 }
 
 // Each glyph reads as arrival → departure at that corner, so all four turns
-// share one bent-arrow language:
+// share one curved-arrow language:
 //   10: right → down   11: down → left   20: left → down   21: down → right
 export const BOARD_ROW_TURN_MARKERS: RowTurnMarker[][] = [
   [{ side: 'right', glyph: '⤵', label: 'Path arrives along row 1, then turns down to square 11' }],
   [
     { side: 'right', glyph: '⤶', label: 'Path arrives down from 10, then runs left to 20' },
-    { side: 'left', glyph: '⬐', label: 'Path arrives along row 2, then turns down to square 21' },
+    { side: 'left', glyph: '⤵', flipX: true, label: 'Path arrives along row 2, then turns down to square 21' },
   ],
   [{ side: 'left', glyph: '⤷', label: 'Path arrives down from 20, then runs right to 30' }],
 ];

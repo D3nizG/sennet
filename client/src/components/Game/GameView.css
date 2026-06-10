@@ -23,6 +23,14 @@
   z-index: 0;
 }
 
+/* Fallback for browsers without backdrop-filter (e.g. older Firefox): can't
+   blur, so dim the background scene instead to keep the board the focus. */
+@supports not ((backdrop-filter: blur(5px)) or (-webkit-backdrop-filter: blur(5px))) {
+  .game-shell::after {
+    background: rgba(4, 10, 20, 0.45);
+  }
+}
+
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 
 .game-layout {
