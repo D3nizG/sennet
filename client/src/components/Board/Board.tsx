@@ -1,6 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import type { GameState, PieceState, Move, PlayerId } from '@sennet/game-engine';
 import { SPECIAL_SQUARES } from '@sennet/game-engine';
+import {
+  CELL_CENTERS,
+  CELL_HITBOXES,
+  BOARD_ASPECT_RATIO,
+  BOARD_SPECIAL_CELLS,
+  DEBUG_BOARD_POSITIONS,
+} from '../../game/boardGeometry';
 import './Board.css';
 
 interface BoardProps {
@@ -14,35 +21,44 @@ interface BoardProps {
   onSelectSquare: (position: number) => void;
 }
 
-// Square labels for special squares
-const SQUARE_LABELS: Record<number, string> = {
-  13: '𓊖',  // House of Netting
-  14: '𓋹',  // House of Happiness
-  25: '𓋹',  // Extra roll
-  26: '𓈖',  // Waters of Chaos
-  27: '𓂀',  // Safe
-  28: '𓂀',  // Safe
-  29: '𓂀',  // Safe
-};
-
-const SQUARE_TOOLTIPS: Record<number, string> = {
-  13: 'House of Netting — Trap! Turn ends immediately',
-  14: 'House of Happiness — +1 extra roll',
-  25: 'House of Water — +1 extra roll (not safe)',
-  26: 'Waters of Chaos — Piece washed back to sq 13',
-  27: 'Safe Square — Cannot be captured',
-  28: 'Safe Square — Cannot be captured',
-  29: 'Safe Square — Cannot be captured',
-};
-
-// Feature flag: set to true to enable pulsing animation on selectable pieces.
-// Currently disabled (unrequested UI feature).
-const ENABLE_PULSE = false;
+function cellSpecialClass(sqIdx: number): string {
+  if (sqIdx === BOARD_SPECIAL_CELLS.HOUSE_OF_NETTING || sqIdx === BOARD_SPECIAL_CELLS.WATERS_OF_CHAOS) return 'danger';
+  if (sqIdx === BOARD_SPECIAL_CELLS.HOUSE_OF_HAPPINESS || sqIdx === BOARD_SPECIAL_CELLS.HOUSE_OF_WATER) return 'bonus';
+  if ((SPECIAL_SQUARES.SAFE_SQUARES as readonly number[]).includes(sqIdx)) return 'safe';
+  return '';
+}
 
 export function Board({
-  gameState, yourPlayer, opponentColor, yourColor,
-  legalMoves, selectedPiece, onSelectPiece, onSelectSquare,
+  gameState,
+  yourPlayer,
+  opponentColor,
+  yourColor,
+  legalMoves,
+  selectedPiece,
+  onSelectPiece,
+  onSelectSquare,
 }: BoardProps) {
+  // ── Calibration recorder (active only when DEBUG_BOARD_POSITIONS = true) ──
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [calStep, setCalStep] = useState(0);
+  const [calCoords, setCalCoords] = useState<{ x: number; y: number }[]>([]);
+
+  const handleCalClick = useCallback((e: React.MouseEvent) => {
+    if (!DEBUG_BOARD_POSITIONS || calStep >= 30) return;
+    const rect = boardRef.current!.getBoundingClientRect();
+    const x = +((e.clientX - rect.left) / rect.width * 100).toFixed(1);
+    const y = +((e.clientY - rect.top) / rect.height * 100).toFixed(1);
+    const next = [...calCoords, { x, y }];
+    console.log(`sq ${calStep}: { x: ${x}, y: ${y} }`);
+    if (next.length === 30) {
+      console.log('=== CELL_CENTERS (paste into boardGeometry.ts) ===');
+      console.log(JSON.stringify(Object.fromEntries(next.map((c, i) => [i, c])), null, 2));
+    }
+    setCalCoords(next);
+    setCalStep(s => s + 1);
+  }, [calStep, calCoords]);
+
+  // Map position → piece for quick lookup
   const boardMap = useMemo(() => {
     const map = new Map<number, PieceState>();
     for (const p of gameState.pieces) {
@@ -53,89 +69,141 @@ export function Board({
     return map;
   }, [gameState.pieces]);
 
+  // Squares highlighted as legal move targets for the selected piece
   const highlightedSquares = useMemo(() => {
     if (!selectedPiece) return new Set<number>();
     return new Set(
-      legalMoves
-        .filter(m => m.pieceId === selectedPiece)
-        .map(m => m.to)
+      legalMoves.filter(m => m.pieceId === selectedPiece).map(m => m.to)
     );
   }, [selectedPiece, legalMoves]);
 
-  const selectablePieces = useMemo(() => {
-    return new Set(legalMoves.map(m => m.pieceId));
-  }, [legalMoves]);
-
-  const rows = [0, 1, 2];
+  // Piece IDs that the player can select (have at least one legal move)
+  const selectablePieces = useMemo(
+    () => new Set(legalMoves.map(m => m.pieceId)),
+    [legalMoves]
+  );
 
   return (
-    <div className="board-container">
-      <div className="board">
-        {rows.map(row => (
-          <div key={row} className="board-row">
-            {Array.from({ length: 10 }).map((_, col) => {
-              // Convert grid position to logical square index
-              let sqIdx: number;
-              if (row === 0) sqIdx = col;
-              else if (row === 1) sqIdx = 19 - col;
-              else sqIdx = 20 + col;
+    <div
+      ref={DEBUG_BOARD_POSITIONS ? boardRef : undefined}
+      className="senet-board-shell"
+      style={{ aspectRatio: String(BOARD_ASPECT_RATIO) }}
+      onClick={DEBUG_BOARD_POSITIONS ? handleCalClick : undefined}
+    >
+      {/* Layer 1: Board art */}
+      <img
+        className="senet-board-art"
+        src="/assets/boards/board-river.png"
+        alt="Senet board"
+        draggable={false}
+      />
 
-              const piece = boardMap.get(sqIdx);
-              const isHighlighted = highlightedSquares.has(sqIdx);
-              const isSpecial = sqIdx in SQUARE_LABELS;
-              const isSafe = (SPECIAL_SQUARES.SAFE_SQUARES as readonly number[]).includes(sqIdx);
-              const isDanger = sqIdx === 13 || sqIdx === 26;
-              const isBonus = sqIdx === 14 || sqIdx === 25;
-              const isSelected = piece && piece.id === selectedPiece;
-              const isSelectable = piece && selectablePieces.has(piece.id);
+      {/* Layer 2: Clickable hitboxes */}
+      <div className="senet-board-hitboxes" aria-hidden="true">
+        {Array.from({ length: 30 }, (_, sqIdx) => {
+          const hb = CELL_HITBOXES[sqIdx];
+          const piece = boardMap.get(sqIdx);
+          const isHighlighted = highlightedSquares.has(sqIdx);
+          const isSelectable = piece != null && selectablePieces.has(piece.id) && piece.owner === yourPlayer;
+          const isClickable = isHighlighted || isSelectable;
+          const special = cellSpecialClass(sqIdx);
 
-              const pieceColor = piece
-                ? piece.owner === yourPlayer ? yourColor : opponentColor
-                : undefined;
-
-              return (
-                <div
-                  key={sqIdx}
-                  className={[
-                    'square',
-                    isHighlighted && 'highlighted',
-                    isSafe && 'safe',
-                    isDanger && 'danger',
-                    isBonus && 'bonus',
-                    isSelected && 'selected',
-                  ].filter(Boolean).join(' ')}
-                  title={SQUARE_TOOLTIPS[sqIdx] ?? `Square ${sqIdx}`}
-                  onClick={() => {
-                    if (isHighlighted) {
-                      onSelectSquare(sqIdx);
-                    } else if (piece && piece.owner === yourPlayer && isSelectable) {
-                      onSelectPiece(piece.id);
-                    }
-                  }}
-                >
-                  <span className="square-num">{sqIdx}</span>
-                  {isSpecial && <span className="square-icon">{SQUARE_LABELS[sqIdx]}</span>}
-                  {piece && (
-                    <div
-                      className={[
-                        'piece',
-                        ENABLE_PULSE && isSelectable && 'selectable',
-                        isSelected && 'piece-selected',
-                      ].filter(Boolean).join(' ')}
-                      style={{ background: pieceColor }}
-                    >
-                      <span className="piece-symbol">
-                        {piece.owner === 'player1' ? '▲' : '●'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+          return (
+            <button
+              key={sqIdx}
+              className={[
+                'senet-cell-hitbox',
+                isHighlighted && 'is-highlighted',
+                isSelectable && 'is-selectable',
+                special && `is-${special}`,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              style={{
+                left:   `${hb.x}%`,
+                top:    `${hb.y}%`,
+                width:  `${hb.w}%`,
+                height: `${hb.h}%`,
+              }}
+              title={`Square ${sqIdx}`}
+              tabIndex={isClickable ? 0 : -1}
+              onClick={() => {
+                if (isHighlighted) {
+                  onSelectSquare(sqIdx);
+                } else if (isSelectable) {
+                  onSelectPiece(piece!.id);
+                }
+              }}
+            />
+          );
+        })}
       </div>
 
+      {/* Layer 3: Pieces */}
+      <div className="senet-board-pieces">
+        {Array.from(boardMap.entries()).map(([sqIdx, piece]) => {
+          const center = CELL_CENTERS[sqIdx];
+          const isSelected = piece.id === selectedPiece;
+          const isSelectable = selectablePieces.has(piece.id) && piece.owner === yourPlayer;
+          const isHighlightedTarget = highlightedSquares.has(sqIdx);
+          const pieceColor = piece.owner === yourPlayer ? yourColor : opponentColor;
+
+          return (
+            <div
+              key={piece.id}
+              className={[
+                'senet-piece',
+                isSelected && 'senet-piece--selected',
+                isSelectable && 'senet-piece--selectable',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              style={{
+                left: `${center.x}%`,
+                top:  `${center.y}%`,
+                '--piece-color': pieceColor,
+                pointerEvents: isHighlightedTarget ? 'none' : 'auto',
+              } as React.CSSProperties}
+              onClick={() => {
+                if (isSelectable) onSelectPiece(piece.id);
+              }}
+              title={`${piece.owner === yourPlayer ? 'Your' : "Opponent's"} piece`}
+            >
+              <span className="senet-piece__symbol">
+                {piece.owner === 'player1' ? '▲' : '▼'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Layer 4: Debug overlay — toggle DEBUG_BOARD_POSITIONS in boardGeometry.ts */}
+      {DEBUG_BOARD_POSITIONS && (
+        <div className="senet-board-debug">
+          {Array.from({ length: 30 }, (_, i) => {
+            const c = CELL_CENTERS[i];
+            return (
+              <div
+                key={i}
+                className="senet-debug-dot"
+                style={{ left: `${c.x}%`, top: `${c.y}%` }}
+              >
+                {i}
+              </div>
+            );
+          })}
+          {calStep < 30 ? (
+            <div className="senet-calibration-prompt">
+              Click center of square <strong>{calStep}</strong>
+              <span className="senet-calibration-count">({calStep}/30)</span>
+            </div>
+          ) : (
+            <div className="senet-calibration-prompt senet-calibration-prompt--done">
+              Done! Check browser console for CELL_CENTERS JSON.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
