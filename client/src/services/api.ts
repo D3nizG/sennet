@@ -51,6 +51,13 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
 
+  // Exchange a Supabase OAuth access token for a first-party session.
+  googleAuth: (accessToken: string) =>
+    request<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ accessToken }),
+    }),
+
   getProfile: () => request<any>('/profile/me'),
 
   // Public profile of another user (opponent / friend) — safe fields only.

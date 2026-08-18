@@ -11,7 +11,14 @@ generator client {
 model User {
   id           String   @id @default(uuid())
   username     String   @unique
-  passwordHash String
+  // Null for accounts that authenticate via an external provider (e.g. Google
+  // through Supabase) and have never set a local password.
+  passwordHash String?
+  email        String?  @unique
+  // Supabase auth.users id (the JWT `sub`) when the account was linked via an
+  // OAuth provider. Used to find-or-create the local user on Google sign-in.
+  supabaseId   String?  @unique
+  authProvider String   @default("local")
   displayName  String
   houseColor   String   @default("#D4AF37")
   createdAt    DateTime @default(now())

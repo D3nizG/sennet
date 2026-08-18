@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import { EgyptianPanel, EgyptianInput, ParchmentButton } from '../EgyptianTheme';
 import './AuthForm.css';
 
 export function AuthForm() {
-  const { login, register } = useAuth();
+  const { login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
@@ -14,6 +15,30 @@ export function AuthForm() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Surface failures from the post-redirect token exchange (handled in AuthContext).
+  useEffect(() => {
+    const handle = (e: Event) => {
+      setError((e as CustomEvent).detail || 'Google sign-in failed');
+      setGoogleLoading(false);
+    };
+    window.addEventListener('auth:google-error', handle);
+    return () => window.removeEventListener('auth:google-error', handle);
+  }, []);
+
+  const handleGoogle = async () => {
+    setError('');
+    setNotice('');
+    setGoogleLoading(true);
+    try {
+      // Redirects away to Google; the return trip is handled in AuthContext.
+      await loginWithGoogle();
+    } catch (err: any) {
+      setError(err?.message || 'Could not start Google sign-in');
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,10 +117,15 @@ export function AuthForm() {
           <button
             type="button"
             className="auth-google-btn"
-            onClick={() => setNotice('Google sign-in is coming soon.')}
+            onClick={
+              isSupabaseConfigured
+                ? handleGoogle
+                : () => setNotice('Google sign-in is not configured yet.')
+            }
+            disabled={googleLoading}
           >
             <span className="auth-google-g">G</span>
-            Continue with Google
+            {googleLoading ? 'Redirecting…' : 'Continue with Google'}
           </button>
 
           <p className="auth-switch">
