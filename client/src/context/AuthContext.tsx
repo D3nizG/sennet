@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { api, AuthResponse } from '../services/api';
 import { emitLogout } from '../services/socket';
+import { supabase } from '../lib/supabase';
 
 interface User {
   id: string;
@@ -14,6 +15,7 @@ interface AuthContextValue {
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string, displayName: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => void;
   updateUser: (data: Partial<User>) => void;
   loading: boolean;
@@ -53,6 +55,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     handleAuth(res);
   }, [handleAuth]);
 
+  // Kick off the Google OAuth flow. This redirects the browser to Google and
+  // back to our origin; the redirect is handled by the listener below.
+  const loginWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error('Google sign-in is not configured');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+  }, []);
+
+  // When the browser returns from Google, Supabase parses the tokens from the
+  // URL and fires an auth event. We exchange that Supabase access token for our
+  // own first-party session, then drop the Supabase session (we don't use it
+  // beyond this handshake).
+  const exchangingRef = useRef(false);
+  useEffect(() => {
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session?.access_token) return;
+      // Already have a first-party session, or an exchange is in flight.
+      if (localStorage.getItem('sennet_token') || exchangingRef.current) return;
+      exchangingRef.current = true;
+      setLoading(true);
+      try {
+        const res = await api.googleAuth(session.access_token);
+        handleAuth(res);
+      } catch (err) {
+        window.dispatchEvent(
+          new CustomEvent('auth:google-error', {
+            detail: (err as Error)?.message || 'Google sign-in failed',
+          }),
+        );
+      } finally {
+        await supabase!.auth.signOut();
+        exchangingRef.current = false;
+        setLoading(false);
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [handleAuth]);
+
   const logout = useCallback(() => {
     // Notify the server while the socket is still connected so it ends any
     // active game / lobby / queue immediately. The disconnect that follows
@@ -81,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, updateUser, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, loginWithGoogle, logout, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
