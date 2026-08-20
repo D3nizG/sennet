@@ -77,11 +77,7 @@ describe('GameManager', () => {
       initialRolls: { rounds: [], decided: true, firstPlayer: 'player1' },
     } as GameState;
 
-    mockedSecureRoll.mockReturnValueOnce(6).mockReturnValueOnce(2);
-    const six = gm.doRoll(game);
-    expect(six.event).toBe('rolled_6');
-    expect(six.legalMoves).toEqual([]);
-
+    mockedSecureRoll.mockReturnValueOnce(2);
     const two = gm.doRoll(game);
     expect(two.rollValue).toBe(2);
     expect(two.state.turnPhase).toBe('move');

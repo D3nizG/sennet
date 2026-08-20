@@ -122,13 +122,13 @@ export function GameHUD({
   return (
     <div className="game-hud">
       <PlayerStatus
-        name={yourName}
-        color={yourColor}
-        borneOff={yourBorneOff}
-        isActive={isYourTurn && !gameOver}
+        name={opponentName}
+        color={opponentColor}
+        borneOff={opponentBorneOff}
+        isActive={!isYourTurn && !gameOver}
         side="left"
-        onProfileClick={onProfileClick}
-        profileTitle="View your profile"
+        onProfileClick={onOpponentClick}
+        profileTitle={`View ${opponentName || 'opponent'}'s profile`}
       />
 
       <TurnBanner
@@ -139,13 +139,13 @@ export function GameHUD({
       />
 
       <PlayerStatus
-        name={opponentName}
-        color={opponentColor}
-        borneOff={opponentBorneOff}
-        isActive={!isYourTurn && !gameOver}
+        name={yourName}
+        color={yourColor}
+        borneOff={yourBorneOff}
+        isActive={isYourTurn && !gameOver}
         side="right"
-        onProfileClick={onOpponentClick}
-        profileTitle={`View ${opponentName || 'opponent'}'s profile`}
+        onProfileClick={onProfileClick}
+        profileTitle="View your profile"
       />
     </div>
   );

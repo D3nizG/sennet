@@ -25,19 +25,19 @@ describe('roll helpers', () => {
     expect(one.allowsMovement).toBe(true);
     expect(one.grantsExtraRoll).toBe(true);
 
-    const six = roll(() => 0.999999);
-    expect(six.value).toBe(6);
-    expect(six.allowsMovement).toBe(false);
-    expect(six.grantsExtraRoll).toBe(false);
+    const five = roll(() => 0.999999);
+    expect(five.value).toBe(5);
+    expect(five.allowsMovement).toBe(true);
+    expect(five.grantsExtraRoll).toBe(true);
 
-    const two = roll(() => 0.2); // floor(1.2)+1 => 2
+    const two = roll(() => 0.2); // floor(1.0)+1 => 2
     expect(two.value).toBe(2);
     expect(two.allowsMovement).toBe(true);
     expect(two.grantsExtraRoll).toBe(false);
   });
 
-  it('rollValue returns inclusive 1-6', () => {
+  it('rollValue returns inclusive 1-5', () => {
     expect(rollValue(() => 0)).toBe(1);
-    expect(rollValue(() => 0.999999)).toBe(6);
+    expect(rollValue(() => 0.999999)).toBe(5);
   });
 });

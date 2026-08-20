@@ -223,9 +223,19 @@ export class TurnRunner {
 
     this.cleanupGame(gameId);
 
+    // Register the rematch pairing BEFORE the async DB write below. A resign
+    // is very often immediately followed by a GAME_LEAVE (the "back to lobby"
+    // flow resigns then navigates away in the same tick) — if registration
+    // happened only after awaiting the write, GAME_LEAVE's handler could run
+    // first, find no pending rematch yet, and silently drop the "this player
+    // left" mark. The opponent would then be able to click rematch as if the
+    // other player were still there. Registering synchronously here — before
+    // any await — guarantees it's in place before the next queued socket
+    // event for this connection can be processed.
+    this.registerRematch(game);
+
     try {
       const state = await this.gameManager.resign(game, playerId);
-      this.registerRematch(game);
       this.io.to(gameId).emit('GAME_OVER', {
         winner: state.winner!,
         reason: 'resign',
@@ -642,9 +652,13 @@ export class TurnRunner {
   /** End game, persist, emit GAME_OVER, clean up timers. */
   private async finishGame(game: ActiveGame, winner: PlayerId, reason: string): Promise<void> {
     this.cleanupGame(game.gameId);
+    // Register before the async persist for the same reason as handleResign —
+    // see the comment there. A player who finishes and immediately leaves the
+    // post-game screen shouldn't be able to have their departure lost to a
+    // race against this write.
+    this.registerRematch(game);
     try {
       await this.gameManager.endGame(game, winner, reason);
-      this.registerRematch(game);
       this.io.to(game.gameId).emit('GAME_OVER', {
         winner,
         reason: reason as any,

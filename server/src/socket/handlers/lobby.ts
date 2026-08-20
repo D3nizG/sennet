@@ -158,7 +158,11 @@ export function registerLobbyHandlers(
       return;
     }
 
-    lobbyManager.startGame(lobby.id);
+    // Guards against a duplicate/racing LOBBY_START (e.g. a double-click)
+    // creating two games for the same lobby — only the first call through
+    // wins; a re-entrant call gets null back and is ignored.
+    if (!lobbyManager.startGame(lobby.id)) return;
+
     queueManager.leave(lobby.host.userId);
     if (lobby.guest) queueManager.leave(lobby.guest.userId);
 

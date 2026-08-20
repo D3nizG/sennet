@@ -16,7 +16,7 @@ interface GameActionAreaProps {
   onBearOff: () => void;
 }
 
-const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄'];
 
 function DiceDisplay({ value, rolling }: { value: number | null; rolling: boolean }) {
   if (rolling) {
@@ -63,8 +63,6 @@ export function GameActionArea({
     ? 'Rolling…'
     : lastRoll == null
     ? 'Awaiting Roll'
-    : lastRoll === 6
-    ? 'No Move — Roll Again'
     : `Roll: ${lastRoll}`;
 
   return (

@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { secureRoll, generateCode } from '../utils/rng.js';
 
 describe('rng utils', () => {
-  it('secureRoll is always in the 1-6 range', () => {
+  it('secureRoll is always in the 1-5 range', () => {
     for (let i = 0; i < 50; i++) {
       const value = secureRoll();
       expect(value).toBeGreaterThanOrEqual(1);
-      expect(value).toBeLessThanOrEqual(6);
+      expect(value).toBeLessThanOrEqual(5);
     }
   });
 

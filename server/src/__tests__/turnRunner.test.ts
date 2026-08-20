@@ -35,10 +35,10 @@ function customPieces(config: Array<{ owner: PlayerId; position: number }>): Pie
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Initial Faceoff', () => {
-  it('repeats rounds until exactly one player rolls a 1', () => {
+  it('repeats rounds until one player rolls higher', () => {
     let state = initGame('faceoff-test');
 
-    // Round 1: both roll 3 → not decided
+    // Round 1: both roll 3 → tie, not decided
     state = performInitialRoll(state, 3, 3);
     expect(state.initialRolls.decided).toBe(false);
     expect(state.phase).toBe('initial_roll');
@@ -47,8 +47,8 @@ describe('Initial Faceoff', () => {
     state = performInitialRoll(state, 1, 1);
     expect(state.initialRolls.decided).toBe(false);
 
-    // Round 3: player1 rolls 1, player2 rolls 4 → decided
-    state = performInitialRoll(state, 1, 4);
+    // Round 3: player1 rolls 4, player2 rolls 1 → decided
+    state = performInitialRoll(state, 4, 1);
     expect(state.initialRolls.decided).toBe(true);
     expect(state.initialRolls.firstPlayer).toBe('player1');
     expect(state.phase).toBe('playing');
@@ -58,35 +58,35 @@ describe('Initial Faceoff', () => {
     expect(state.initialRolls.rounds.length).toBe(3);
   });
 
-  it('assigns first player to player2 when they roll 1', () => {
+  it('assigns first player to player2 when they roll higher', () => {
     let state = initGame('faceoff-p2');
-    state = performInitialRoll(state, 5, 1);
+    state = performInitialRoll(state, 1, 5);
     expect(state.initialRolls.firstPlayer).toBe('player2');
     expect(state.currentPlayer).toBe('player2');
   });
 
-  it('does not decide when neither rolls 1', () => {
+  it('does not decide on a tie', () => {
     let state = initGame('faceoff-nodecide');
-    state = performInitialRoll(state, 2, 5);
+    state = performInitialRoll(state, 2, 2);
     expect(state.initialRolls.decided).toBe(false);
     expect(state.pieces.length).toBe(0);
   });
 
-  it('handles many rounds until a 1 appears', () => {
+  it('handles many tied rounds until a decisive roll', () => {
     let state = initGame('faceoff-many');
     for (let i = 0; i < 10; i++) {
-      state = performInitialRoll(state, 3, 4);
+      state = performInitialRoll(state, 3, 3);
       expect(state.initialRolls.decided).toBe(false);
     }
     state = performInitialRoll(state, 2, 1);
     expect(state.initialRolls.decided).toBe(true);
-    expect(state.initialRolls.firstPlayer).toBe('player2');
+    expect(state.initialRolls.firstPlayer).toBe('player1');
     expect(state.initialRolls.rounds.length).toBe(11);
   });
 
   it('winner rolls again to start actual play (turnPhase=roll after faceoff)', () => {
     let state = initGame('faceoff-continue');
-    state = performInitialRoll(state, 1, 3);
+    state = performInitialRoll(state, 3, 1);
     expect(state.phase).toBe('playing');
     expect(state.turnPhase).toBe('roll');
     expect(state.currentRoll).toBeNull();
@@ -117,21 +117,21 @@ describe('User-Driven Faceoff Flow', () => {
     expect(faceoffRolls.player1).toBe(3);
     expect(faceoffRolls.player2).toBeNull(); // player2 hasn't rolled yet
 
-    // Player2 clicks Roll
-    faceoffRolls.player2 = 5;
+    // Player2 clicks Roll (ties player1's roll)
+    faceoffRolls.player2 = 3;
 
     // Both rolled → evaluate
     state = performInitialRoll(state, faceoffRolls.player1, faceoffRolls.player2);
-    expect(state.initialRolls.decided).toBe(false); // neither rolled 1
+    expect(state.initialRolls.decided).toBe(false); // tie
 
     // Round 2: reset faceoff rolls
     faceoffRolls.player1 = null;
     faceoffRolls.player2 = null;
 
     // Player2 clicks Roll first this time
-    faceoffRolls.player2 = 1;
+    faceoffRolls.player2 = 5;
     // Player1 clicks Roll
-    faceoffRolls.player1 = 4;
+    faceoffRolls.player1 = 1;
 
     state = performInitialRoll(state, faceoffRolls.player1, faceoffRolls.player2);
     expect(state.initialRolls.decided).toBe(true);
@@ -147,11 +147,11 @@ describe('User-Driven Faceoff Flow', () => {
     };
 
     // Player1 rolls manually
-    faceoffRolls.player1 = 2;
+    faceoffRolls.player1 = 1;
 
     // Timer expires → auto-roll for player2
     // (In real code, secureRoll() is used; here we simulate with a fixed value)
-    faceoffRolls.player2 = 1; // auto-rolled a 1
+    faceoffRolls.player2 = 4; // auto-rolled higher
 
     state = performInitialRoll(state, faceoffRolls.player1, faceoffRolls.player2);
     expect(state.initialRolls.decided).toBe(true);
@@ -162,8 +162,8 @@ describe('User-Driven Faceoff Flow', () => {
     let state = initGame('faceoff-both-timeout');
 
     // Neither player rolled → server auto-rolls both at deadline
-    const p1AutoRoll = 4;
-    const p2AutoRoll = 1;
+    const p1AutoRoll = 1;
+    const p2AutoRoll = 4;
 
     state = performInitialRoll(state, p1AutoRoll, p2AutoRoll);
     expect(state.initialRolls.decided).toBe(true);
@@ -339,25 +339,6 @@ describe('AI Pacing Logic', () => {
     expect(state.turnPhase).toBe('roll');
   });
 
-  it('AI handles roll 6 correctly (no movement, rolls again)', () => {
-    const pieces = customPieces([
-      { owner: 'player2', position: 15 },
-      { owner: 'player1', position: 5 },
-    ]);
-    let state = playingGame({
-      pieces,
-      currentPlayer: 'player2',
-    });
-
-    state = applyRoll(state, 6);
-    expect(state.currentPlayer).toBe('player2');
-    expect(state.turnPhase).toBe('roll');
-    expect(state.currentRoll).toBeNull();
-
-    state = applyRoll(state, 2);
-    expect(state.turnPhase).toBe('move');
-  });
-
   it('AI handles extra rolls from 1/4/5', () => {
     const pieces = customPieces([
       { owner: 'player2', position: 20 },
@@ -387,7 +368,7 @@ describe('AI Pacing Logic', () => {
 describe('AI First Player', () => {
   it('AI as first player can roll and move', () => {
     let state = initGame('ai-first');
-    state = performInitialRoll(state, 3, 1);
+    state = performInitialRoll(state, 1, 3);
     expect(state.currentPlayer).toBe('player2');
     expect(state.phase).toBe('playing');
     expect(state.turnPhase).toBe('roll');
@@ -410,7 +391,7 @@ describe('AI First Player', () => {
 
   it('AI first player can handle a full multi-step turn (extra rolls)', () => {
     let state = initGame('ai-first-multi');
-    state = performInitialRoll(state, 3, 1);
+    state = performInitialRoll(state, 1, 3);
     expect(state.currentPlayer).toBe('player2');
 
     state = applyRoll(state, 5);
@@ -470,13 +451,5 @@ describe('Auto-Move Edge Cases', () => {
     // Blocked → switched to opponent, no move phase
     expect(rolled.currentPlayer).toBe('player2');
     expect(rolled.turnPhase).toBe('roll');
-  });
-
-  it('roll 6 does not enter move phase', () => {
-    const state = playingGame();
-    const rolled = applyRoll(state, 6);
-    expect(rolled.turnPhase).toBe('roll');
-    expect(rolled.currentRoll).toBeNull();
-    expect(rolled.currentPlayer).toBe('player1');
   });
 });

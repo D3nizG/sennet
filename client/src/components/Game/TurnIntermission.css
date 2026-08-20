@@ -1,0 +1,210 @@
+/* ── Turn Intermission overlay ────────────────────────────────────────────── */
+/* Shown after the faceoff resolves, and on every mid-game turn handoff, so a
+   player can never miss "whose turn is it now" — split into two color panels
+   (each player's house color) by a jagged zigzag divider. Sides are fixed
+   (opponent left, you right — matching the HUD); the active player's side
+   gets a glow instead of swapping position. On desktop this overlays just the
+   board column, blurred and tinted so the board is still visible underneath;
+   on mobile it covers the full screen. */
+
+/* TODO: the board (and this overlay) currently mount together the instant the
+   faceoff intermission flips on, so the overlay's fade-in and the board's own
+   appearance happen in the same frame and it reads as an instant "pop" rather
+   than a smooth transition. Follow-up: stagger the mount (e.g. render the
+   board first, then delay this overlay's mount by a tick or two) so the
+   fade-in is actually perceptible. */
+.turn-intermission {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: inherit;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: turn-intermission-fade-in 0.25s ease;
+}
+
+@keyframes turn-intermission-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.turn-intermission__side {
+  position: absolute;
+  inset: 0;
+  background: var(--side-color, var(--egypt-gold));
+  opacity: 0.5;
+}
+
+.turn-intermission__side--left {
+  clip-path: polygon(
+    0 0, 55% 0, 45% 7%, 55% 14%, 45% 21%, 55% 28%, 45% 35%,
+    55% 42%, 45% 49%, 55% 56%, 45% 63%, 55% 70%, 45% 77%,
+    55% 84%, 45% 91%, 55% 98%, 50% 100%, 0 100%
+  );
+  z-index: 1;
+}
+
+.turn-intermission__side--right {
+  z-index: 0;
+}
+
+/* Content (avatar/name) is a separate layer from the zigzag background so it
+   can be anchored to its own half of the screen instead of being centered
+   across the full-bleed background div. */
+.turn-intermission__content {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 2;
+  max-width: clamp(100px, 30vw, 200px);
+}
+
+.turn-intermission__content--left {
+  left: 22%;
+  transform: translate(-50%, -50%);
+}
+
+.turn-intermission__content--right {
+  left: 78%;
+  transform: translate(-50%, -50%);
+}
+
+.turn-intermission__avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    color-mix(in srgb, var(--avatar-color, var(--egypt-gold)) 70%, white 30%),
+    var(--avatar-color, var(--egypt-gold))
+  );
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.2s ease;
+}
+
+/* Active player's side — glow instead of a position swap so sides stay fixed. */
+.turn-intermission__content--active .turn-intermission__avatar {
+  animation: turn-intermission-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes turn-intermission-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 4px var(--egypt-gold, #d8a93a),
+      0 0 20px rgba(216, 169, 58, 0.6),
+      0 4px 24px rgba(0, 0, 0, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px var(--egypt-gold, #d8a93a),
+      0 0 34px rgba(216, 169, 58, 0.95),
+      0 4px 24px rgba(0, 0, 0, 0.45);
+  }
+}
+
+.turn-intermission__avatar-initial {
+  color: rgba(255, 255, 255, 0.95);
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+.turn-intermission__name {
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  font-size: 1.1rem;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turn-intermission__tag {
+  padding: 0.2rem 0.7rem;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.turn-intermission__banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.25rem 2rem;
+  background: rgba(5, 11, 22, 0.72);
+  border: 1px solid var(--egypt-border-soft);
+  border-radius: var(--egypt-radius-lg);
+  box-shadow: var(--egypt-shadow-deep);
+  backdrop-filter: blur(6px);
+  max-width: 88vw;
+  text-align: center;
+}
+
+.turn-intermission__title {
+  color: var(--egypt-text-main);
+  font-size: 1.4rem;
+  white-space: nowrap;
+}
+
+.turn-intermission__subtitle {
+  color: var(--egypt-gold-bright);
+  font-size: 0.8rem;
+}
+
+.turn-intermission__hint {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-top: 0.25rem;
+}
+
+/* Mobile: cover the full screen (fixed to viewport) instead of just the board
+   column, since there's no separate column layout to frame it against. */
+@media (max-width: 640px) {
+  .turn-intermission {
+    position: fixed;
+    z-index: 300;
+  }
+
+  .turn-intermission__avatar {
+    width: 64px;
+    height: 64px;
+  }
+
+  .turn-intermission__avatar-initial {
+    font-size: 1.5rem;
+  }
+
+  .turn-intermission__name {
+    font-size: 0.95rem;
+  }
+
+  .turn-intermission__title {
+    font-size: 1.15rem;
+    white-space: normal;
+  }
+
+  .turn-intermission__banner {
+    padding: 1rem 1.25rem;
+  }
+}

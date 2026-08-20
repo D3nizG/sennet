@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 
-/** Cryptographically secure random integer in [1, 6]. */
+/** Cryptographically secure random integer in [1, 5]. */
 export function secureRoll(): number {
-  return crypto.randomInt(1, 7);
+  return crypto.randomInt(1, 6);
 }
 
 /** Generate a random lobby/room code (6 uppercase alphanumeric chars). */

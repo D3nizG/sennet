@@ -17,9 +17,9 @@ export interface PieceState {
 // ─── Roll ────────────────────────────────────────────────────────────────────
 
 export interface RollResult {
-  value: number;              // 1-6
-  allowsMovement: boolean;    // false only for 6
-  grantsExtraRoll: boolean;   // true for 1, 4, 5 (after moving); 6 re-rolls automatically
+  value: number;              // 1-5
+  allowsMovement: boolean;    // always true
+  grantsExtraRoll: boolean;   // true for 1, 4, 5 (after moving)
 }
 
 // ─── Move ────────────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ export interface MoveLogEntry {
   turnNumber: number;
   player: PlayerId;
   rollValue: number;
-  move: Move | null;    // null = blocked / skipped / roll-6
+  move: Move | null;    // null = blocked / skipped
   event?: string;       // e.g. "blocked", "waters_of_chaos", "house_of_netting"
   timestamp: number;
 }

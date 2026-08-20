@@ -23,6 +23,16 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// True right after Supabase redirects back from Google, before it has
+// consumed the code/tokens from the URL. Used to keep the loading screen up
+// instead of flashing the login form while the exchange is still pending.
+function hasPendingOAuthRedirect(): boolean {
+  return (
+    window.location.hash.includes('access_token=') ||
+    window.location.search.includes('code=')
+  );
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -35,7 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(stored);
       setUser(JSON.parse(storedUser));
     }
-    setLoading(false);
+    // If a Google redirect is in flight, leave loading on — the auth-state
+    // listener below will resolve it once the exchange finishes (success or
+    // failure), so the login form never gets a chance to flash on screen.
+    if (!hasPendingOAuthRedirect()) {
+      setLoading(false);
+    }
   }, []);
 
   const handleAuth = useCallback((res: AuthResponse) => {
@@ -74,9 +89,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!supabase) return;
     const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.access_token) return;
       // Already have a first-party session, or an exchange is in flight.
       if (localStorage.getItem('sennet_token') || exchangingRef.current) return;
+      if (!session?.access_token) {
+        // Nothing to exchange (no redirect pending, or it failed before a
+        // session was established) — stop blocking on the loading screen.
+        setLoading(false);
+        return;
+      }
       exchangingRef.current = true;
       setLoading(true);
       try {

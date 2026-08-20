@@ -45,11 +45,6 @@ export function runAITurn(
       const prevPlayer = current.currentPlayer;
       current = applyRoll(current, rollValue);
 
-      if (rollValue === 6) {
-        actions.push({ type: 'roll', value: 6, event: 'rolled_6' });
-        continue; // rolls again
-      }
-
       if (current.turnPhase === 'roll' && current.currentPlayer !== prevPlayer) {
         // Was blocked — turn skipped
         actions.push({ type: 'blocked', rollValue });
