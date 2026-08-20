@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { EgyptianPanel, EgyptianInput, ParchmentButton } from '../EgyptianTheme';
+import { withClickSound } from '../../audio/clickSound';
 import './AuthForm.css';
 
 export function AuthForm() {
@@ -133,7 +134,7 @@ export function AuthForm() {
             <button
               type="button"
               className="link-btn"
-              onClick={() => { setIsLogin(!isLogin); setError(''); setNotice(''); }}
+              onClick={withClickSound('ui-secondary', () => { setIsLogin(!isLogin); setError(''); setNotice(''); })}
             >
               {isLogin ? 'Sign up' : 'Sign in'}
             </button>

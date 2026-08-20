@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { api } from '../../services/api';
+import { withClickSound } from '../../audio/clickSound';
 import {
   EgyptianPanel,
   EgyptianButton,
@@ -202,7 +203,7 @@ export function ProfileView() {
                         title={name}
                         className={`profile-color-swatch${houseColor === hex ? ' profile-color-swatch--active' : ''}`}
                         style={{ background: hex }}
-                        onClick={() => setHouseColor(hex)}
+                        onClick={withClickSound('ui-secondary', () => setHouseColor(hex))}
                       />
                     ))}
                   </div>

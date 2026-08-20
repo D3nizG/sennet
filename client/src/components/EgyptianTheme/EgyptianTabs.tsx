@@ -1,4 +1,5 @@
 import './EgyptianTabs.css';
+import { withClickSound } from '../../audio/clickSound';
 
 interface Tab {
   id: string;
@@ -23,7 +24,7 @@ export function EgyptianTabs({ tabs, activeTab, onTabChange, className }: Egypti
           role="tab"
           aria-selected={activeTab === tab.id}
           className={`egypt-tab ${activeTab === tab.id ? 'egypt-tab--active' : ''}`}
-          onClick={() => onTabChange(tab.id)}
+          onClick={withClickSound('ui-secondary', () => onTabChange(tab.id))}
         >
           {tab.label}
           {tab.dot && <span className="egypt-tab__dot" aria-label="unread" />}

@@ -61,6 +61,11 @@ client/dist/
 # ─── Reference Images ─────────────────────────────────────────────────────────
 /reference_images/
 
+# ─── Reference Sounds ─────────────────────────────────────────────────────────
+# Working copies of source audio. Only the trimmed files actually served from
+# client/public/sfx/ belong in the repo.
+/reference_sounds/
+
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 .claude/
 .cache/

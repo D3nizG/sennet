@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { withClickSound } from '../../audio/clickSound';
 import './GameHeader.css';
 
 interface GameHeaderProps {
@@ -18,7 +19,7 @@ export function BrandMark() {
   return (
     <button
       className="brand-mark"
-      onClick={() => navigate('/')}
+      onClick={withClickSound('ui-secondary', () => navigate('/'))}
       aria-label="Go to lobby"
     >
       <span className="brand-mark__icon">𓁹</span>
@@ -53,7 +54,7 @@ interface UserNameplateProps {
 export function UserNameplate({ username, handle, avatarColor, onProfileClick }: UserNameplateProps) {
   const initials = username ? username[0].toUpperCase() : '?';
   return (
-    <button className="user-nameplate" onClick={onProfileClick} aria-label="View profile">
+    <button className="user-nameplate" onClick={withClickSound('ui-secondary', onProfileClick)} aria-label="View profile">
       <div className="user-nameplate__text">
         <span className="user-nameplate__name egypt-body">{username}</span>
         {handle && <span className="user-nameplate__handle egypt-muted">{handle}</span>}
@@ -71,7 +72,7 @@ export function GameHeader({ username, handle, avatarColor, onProfileClick, clas
       {hideProfile ? (
         <button
           className="header-back-btn egypt-label"
-          onClick={onBack ?? (() => navigate(-1))}
+          onClick={withClickSound('ui-secondary', onBack ?? (() => navigate(-1)))}
           aria-label="Go back"
         >
           ← Back

@@ -10,6 +10,8 @@ import { GameActionArea } from './GameActionArea';
 import { BottomGamePanel } from './BottomGamePanel';
 import { TurnIntermission } from './TurnIntermission';
 import { BEAR_OFF_POSITION } from '@sennet/game-engine';
+import { play, preloadGroup } from '../../audio/soundManager';
+import { withClickSound } from '../../audio/clickSound';
 import './GameView.css';
 
 export function GameView() {
@@ -55,6 +57,8 @@ export function GameView() {
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
   }, [gameState?.phase, gameState?.turnPhase, moveDeadline, rollDeadlineAt]);
+
+  useEffect(() => { preloadGroup('game'); }, []);
 
   useEffect(() => {
     if (connected && !gameState) requestRejoin();
@@ -107,6 +111,7 @@ export function GameView() {
       const t = window.setTimeout(() => {
         setFaceoffPanelHold(false);
         setFaceoffIntermission(true);
+        play('game-start');
       }, FACEOFF_RESULT_HOLD_MS);
       return () => window.clearTimeout(t);
     }
@@ -139,6 +144,7 @@ export function GameView() {
     prevCurrentPlayerRef.current = currPlayer;
     if (prev && currPlayer && prev !== currPlayer) {
       setTurnChangeIntermission(true);
+      play('turn-switch');
     }
   }, [gameState?.currentPlayer, gameState?.phase]);
 
@@ -189,6 +195,23 @@ export function GameView() {
     : null;
 
   const yourBonusRolls = hasActiveGame && gameState.currentPlayer === yourPlayer ? gameState.extraRolls : 0;
+
+  // ── Countdown ticking ────────────────────────────────────────────────────
+  // The tick asset is a continuous ticking bed rather than a single tick, so it
+  // starts once when the countdown enters its final seconds and is stopped on
+  // the way out. The effect's cleanup covers every exit path — turn ends, the
+  // deadline clears, the player navigates away — so it can't outlive the turn.
+  const TICK_FROM = 3;
+  const tickActive =
+    timeLeft !== null && timeLeft <= TICK_FROM && timeLeft > 0 &&
+    (isYourTurn || isFaceoff) &&
+    !gameOver && !isAiGame && !faceoffPanelHold && !showTurnIntermission;
+
+  useEffect(() => {
+    if (!tickActive) return;
+    const handle = play('clock-tick', { dedupe: false });
+    return () => handle.stop();
+  }, [tickActive]);
 
   // ── Roll animation ───────────────────────────────────────────────────────
   const clearRollAnimation = useCallback(() => {
@@ -301,7 +324,7 @@ export function GameView() {
   // ── Timer bar ────────────────────────────────────────────────────────────
   const showTimer = timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && !faceoffPanelHold && !showTurnIntermission;
   const timerBar = showTimer ? (
-    <div className={`game-timer-bar${timeLeft <= 2 ? ' game-timer-bar--urgent' : ''}`}>
+    <div className={`game-timer-bar${timeLeft <= TICK_FROM ? ' game-timer-bar--urgent' : ''}`}>
       <div
         className="game-timer-fill"
         style={{ width: `${Math.min(100, (timeLeft / deadlineWindowSeconds) * 100)}%` }}
@@ -321,7 +344,7 @@ export function GameView() {
       <div className="game-layout">
         {/* ── Minimal game topbar ── */}
         <div className="game-topbar">
-          <button className="game-back-btn egypt-label" onClick={handleBack}>
+          <button className="game-back-btn egypt-label" onClick={withClickSound('ui-secondary', handleBack)}>
             ← Lobby
           </button>
           <span className="game-brand egypt-display">𓁹 Sennet</span>
