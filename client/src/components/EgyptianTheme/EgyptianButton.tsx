@@ -1,11 +1,15 @@
 import './EgyptianButton.css';
+import { withClickSound } from '../../audio/clickSound';
+import type { CueName } from '../../audio/cues';
 
 interface EgyptianButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
   danger?: boolean;
+  /** Override the default click cue, or pass null for a silent button. */
+  soundCue?: CueName | null;
 }
 
-export function EgyptianButton({ children, fullWidth, danger, className, ...props }: EgyptianButtonProps) {
+export function EgyptianButton({ children, fullWidth, danger, className, soundCue = 'ui-secondary', onClick, ...props }: EgyptianButtonProps) {
   return (
     <button
       className={[
@@ -17,6 +21,7 @@ export function EgyptianButton({ children, fullWidth, danger, className, ...prop
       ]
         .filter(Boolean)
         .join(' ')}
+      onClick={withClickSound(soundCue, onClick)}
       {...props}
     >
       {children}

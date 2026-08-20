@@ -5,7 +5,11 @@ import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { GameProvider } from './context/GameContext';
 import App from './App';
+import { initAudio, preloadGroup } from './audio/soundManager';
 import './index.css';
+
+initAudio();
+preloadGroup('ui');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -4,6 +4,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useGame } from '../../hooks/useGame';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { withClickSound } from '../../audio/clickSound';
 import type {
   LobbyUpdatePayload,
   LobbyInvitePayload,
@@ -342,7 +343,7 @@ export function LobbyView() {
       {/* ── Friends toggle tab ── */}
       <button
         className="lobby-friends-tab"
-        onClick={() => setFriendsOpen(o => !o)}
+        onClick={withClickSound('ui-secondary', () => setFriendsOpen(o => !o))}
         aria-label="Toggle friends panel"
       >
         <span className="lobby-friends-tab__icon">𓁹</span>

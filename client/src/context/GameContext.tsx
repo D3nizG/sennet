@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useSocket } from './SocketContext';
+import { useAuth } from './AuthContext';
+import { play, preloadGroup } from '../audio/soundManager';
+import { SPECIAL_SQUARES } from '@sennet/game-engine';
 import type {
   GameState, PlayerId, Move,
   GameStatePayload, GameRollResultPayload,
@@ -85,19 +88,52 @@ const GameContext = createContext<GameContextValue>({
   leaveRematch: () => {},
 });
 
+// ─── Sound dispatch ──────────────────────────────────────────────────────────
+
+// The engine collapses a move down to a single `event` string, so a capture
+// onto a special square loses one half of what happened. The destination
+// square is unambiguous, so the tile cue is derived from `move.to` and layered
+// over the base placement cue instead.
+function playMoveSounds({ event, move }: GameMoveAppliedPayload) {
+  if (event === 'bear_off') {
+    play('bear-off');
+  } else if (move.type === 'capture' || event === 'capture') {
+    play('piece-capture');
+  } else {
+    play('piece-place');
+  }
+
+  switch (move.to) {
+    case SPECIAL_SQUARES.HOUSE_OF_NETTING:   play('bad-netting'); break;
+    case SPECIAL_SQUARES.WATERS_OF_CHAOS:    play('bad-chaos');   break;
+    case SPECIAL_SQUARES.HOUSE_OF_HAPPINESS:
+    case SPECIAL_SQUARES.HOUSE_OF_WATER:     play('bonus');       break;
+  }
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const { socket } = useSocket();
+  const { user } = useAuth();
   const [game, setGame] = useState<GameInfo>(INITIAL_STATE);
   // Track if we've already requested rejoin to avoid spamming
   const rejoinRequested = useRef(false);
+
+  // Sound dispatch happens inside the socket handlers below, which are
+  // registered once and close over these refs rather than over state.
+  const yourPlayerRef = useRef<PlayerId | null>(null);
+  const userIdRef = useRef<string | null>(null);
+  yourPlayerRef.current = game.yourPlayer;
+  userIdRef.current = user?.id ?? null;
 
   // ── Socket event listeners (registered ONCE at provider level) ──
   useEffect(() => {
     if (!socket) return;
 
     const onQueueMatched = (data: QueueMatchedPayload) => {
+      preloadGroup('game');
+      play('match-found');
       // Start every match from a clean slate so a previous game's gameOver,
       // initialRolls, faceoff or board state can't bleed into the new one.
       setGame({
@@ -135,6 +171,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onRollResult = (data: GameRollResultPayload) => {
+      // Driven by the result rather than the button so a timed-out auto-roll,
+      // and the AI's roll, are as audible as one the player asked for.
+      play('dice-roll');
+      if (data.event === 'blocked') play('blocked');
       setGame(prev => ({
         ...prev,
         lastRoll: data.value,
@@ -144,6 +184,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onMoveApplied = (data: GameMoveAppliedPayload) => {
+      playMoveSounds(data);
       setGame(prev => ({
         ...prev,
         gameState: data.gameState,
@@ -157,6 +198,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onGameOver = (data: GameOverPayload) => {
+      play(data.winner === yourPlayerRef.current ? 'game-end-win' : 'game-end-lose');
       setGame(prev => ({
         ...prev,
         gameState: data.finalState,
@@ -170,6 +212,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onInitialRoll = (data: InitialRollPayload) => {
+      play('dice-roll');
       setGame(prev => ({
         ...prev,
         initialRolls: [...prev.initialRolls, data],
@@ -177,6 +220,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onChatMessage = (data: ChatMessagePayload) => {
+      // The server echoes the message back to its sender too.
+      if (data.senderId !== userIdRef.current) play('chat-receive');
       setGame(prev => ({
         ...prev,
         chatMessages: [...prev.chatMessages, data],
@@ -257,6 +302,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const sendChatMessage = useCallback((message: string) => {
     if (!message.trim()) return;
+    play('chat-send');
     socket?.emit('GAME_CHAT', { message: message.trim() });
   }, [socket]);
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { withClickSound } from '../../audio/clickSound';
 import './GameHUD.css';
 
 interface PlayerStatusProps {
@@ -38,7 +39,7 @@ function PlayerStatus({ name, color, borneOff, isActive, side, onProfileClick, p
     return (
       <button
         className={`hud-player hud-player--${side} hud-player--clickable${isActive ? ' hud-player--active' : ''}`}
-        onClick={onProfileClick}
+        onClick={withClickSound('ui-secondary', onProfileClick)}
         title={profileTitle ?? 'View profile'}
       >
         {inner}

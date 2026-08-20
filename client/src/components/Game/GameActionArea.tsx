@@ -81,10 +81,12 @@ export function GameActionArea({
 
       {/* Primary action */}
       <div className="action-btn-group">
+        {/* No click cue — the throw itself is the sound. */}
         <ParchmentButton
           onClick={onRoll}
           disabled={!canRoll}
           className="action-roll-btn"
+          soundCue={null}
         >
           Roll Die
         </ParchmentButton>

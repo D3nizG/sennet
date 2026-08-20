@@ -3,6 +3,17 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build -w @sennet/game-engine && npm run build -w client",
   "outputDirectory": "client/dist",
+  "headers": [
+    {
+      "source": "/sfx/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
