@@ -51,6 +51,20 @@ describe('LobbyManager', () => {
     expect(started?.status).toBe('starting');
   });
 
+  it('rejects a duplicate/racing startGame call so a lobby can only start once', () => {
+    // Regression test: LOBBY_START firing twice (e.g. a double-click) used to
+    // race past this check and create two separate games for the same lobby.
+    const lm = new LobbyManager();
+    const lobby = lm.create(player('h3'));
+    lm.joinByCode(lobby.code, player('g3'));
+
+    const first = lm.startGame(lobby.id);
+    expect(first?.status).toBe('starting');
+
+    const second = lm.startGame(lobby.id);
+    expect(second).toBeNull();
+  });
+
   it('removes users and cleans up mappings correctly', () => {
     const lm = new LobbyManager();
     const lobby = lm.create(player('host'));

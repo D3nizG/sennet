@@ -70,9 +70,15 @@ export class LobbyManager {
     return id ? this.lobbies.get(id) ?? null : null;
   }
 
+  /**
+   * Transition a lobby into 'starting'. Returns null (and does nothing) if the
+   * lobby is missing a guest OR is already starting — this makes the call
+   * idempotent so a duplicate/racing LOBBY_START (e.g. a double-click) can't
+   * create two games for the same lobby.
+   */
   startGame(lobbyId: string): Lobby | null {
     const lobby = this.lobbies.get(lobbyId);
-    if (!lobby || !lobby.guest) return null;
+    if (!lobby || !lobby.guest || lobby.status === 'starting') return null;
     lobby.status = 'starting';
     return lobby;
   }

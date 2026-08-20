@@ -27,6 +27,7 @@ export function LobbyView() {
   const hasNavigated = useRef(false);
 
   const [queuing, setQueuing] = useState(false);
+  const [startingLobby, setStartingLobby] = useState(false);
   const [lobby, setLobby] = useState<LobbyUpdatePayload | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const [friends, setFriends] = useState<any[]>([]);
@@ -67,12 +68,14 @@ export function LobbyView() {
     const onLobbyUpdate = (data: LobbyUpdatePayload) => setLobby(data);
     const onLobbyCancelled = (data: { reason: string }) => {
       setLobby(null);
+      setStartingLobby(false);
       setError(data.reason || 'Lobby was cancelled');
       setTimeout(() => setError(''), 4000);
     };
     const onInvite = (data: LobbyInvitePayload) => setInvite(data);
     const onFriendsUpdated = () => { void loadFriends(); };
     const onError = (data: { code: string; message: string }) => {
+      setStartingLobby(false);
       setError(data.message);
       setTimeout(() => setError(''), 4000);
     };
@@ -119,8 +122,10 @@ export function LobbyView() {
   }, [socket, joinCode]);
 
   const handleStartLobby = useCallback(() => {
+    if (startingLobby) return;
+    setStartingLobby(true);
     socket?.emit('LOBBY_START');
-  }, [socket]);
+  }, [socket, startingLobby]);
 
   const handleCancelLobby = useCallback(() => {
     socket?.emit('LOBBY_CANCEL');
@@ -278,8 +283,8 @@ export function LobbyView() {
                   {lobby.guestName ? `${lobby.guestName} has joined!` : 'Waiting for opponent…'}
                 </p>
                 {lobby.guestId && lobby.hostId === user?.id && (
-                  <ParchmentButton fullWidth onClick={handleStartLobby}>
-                    Start Game
+                  <ParchmentButton fullWidth onClick={handleStartLobby} disabled={startingLobby}>
+                    {startingLobby ? 'Starting…' : 'Start Game'}
                   </ParchmentButton>
                 )}
                 <EgyptianButton fullWidth className="lobby-cancel-btn" onClick={handleCancelLobby}>
