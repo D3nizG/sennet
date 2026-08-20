@@ -49,10 +49,10 @@ describe('Server-side game flow integration', () => {
     const values2 = Array.from({ length: 10 }, () => rollValue(rng2));
     expect(values1).toEqual(values2);
 
-    // All values should be 1-6
+    // All values should be 1-5
     for (const v of values1) {
       expect(v).toBeGreaterThanOrEqual(1);
-      expect(v).toBeLessThanOrEqual(6);
+      expect(v).toBeLessThanOrEqual(5);
     }
   });
 

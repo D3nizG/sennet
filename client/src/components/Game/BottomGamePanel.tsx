@@ -17,9 +17,8 @@ function describeMove(move: Move): string {
   return `${from} → ${move.to + 1}`;
 }
 
-/** Describe a turn with no move (rolled a 6, or blocked). */
+/** Describe a turn with no move (blocked). */
 function describeNoMove(event?: string): string {
-  if (event === 'rolled_6') return 'rolled a 6 — rolls again';
   if (event === 'blocked') return 'no legal move — turn skipped';
   return 'no move';
 }

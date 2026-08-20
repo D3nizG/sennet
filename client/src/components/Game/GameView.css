@@ -125,6 +125,7 @@
 /* ── Centre column (board + action + panel stay aligned) ────────────────── */
 
 .game-center-col {
+  position: relative; /* anchors the turn-intermission overlay on desktop */
   flex: 1;
   min-height: 0;
   display: flex;

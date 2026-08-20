@@ -8,6 +8,7 @@ import { EgyptianPageShell, ParchmentButton, EgyptianButton } from '../EgyptianT
 import { GameHUD } from './GameHUD';
 import { GameActionArea } from './GameActionArea';
 import { BottomGamePanel } from './BottomGamePanel';
+import { TurnIntermission } from './TurnIntermission';
 import { BEAR_OFF_POSITION } from '@sennet/game-engine';
 import './GameView.css';
 
@@ -39,6 +40,7 @@ export function GameView() {
   // The server resolves color clashes per game; use that resolved color for our
   // own pieces (falling back to the profile preference before state arrives).
   const myColor = yourColor || user?.houseColor || '#D4AF37';
+  const yourDisplayName = user?.displayName ?? user?.username ?? 'You';
 
   // ── Countdown timer ──────────────────────────────────────────────────────
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -86,24 +88,61 @@ export function GameView() {
   const lastResolvedRound = initialRolls.length > 0 ? initialRolls[initialRolls.length - 1] : null;
 
   // After a decided faceoff the server immediately moves to 'playing' (kept in
-  // sync). We briefly HOLD the faceoff overlay client-side so the player can read
-  // who goes first before the board appears. This must only fire on the actual
+  // sync). We hold the faceoff results panel open for a beat so the player can
+  // actually read the final rolls, THEN swap to the TurnIntermission overlay
+  // (which owns its own min-hold/tap-to-dismiss timing) — a two-stage transition
+  // instead of an instant cut. This must only fire on the actual
   // initial_roll → playing TRANSITION — not on remount (e.g. returning from an
   // opponent's profile mid-game), where the decided round is still in history.
-  const [faceoffHold, setFaceoffHold] = useState(false);
+  const FACEOFF_RESULT_HOLD_MS = 1500;
+  const [faceoffPanelHold, setFaceoffPanelHold] = useState(false);
+  const [faceoffIntermission, setFaceoffIntermission] = useState(false);
   const prevPhaseRef = useRef(gameState?.phase);
   useEffect(() => {
     const prev = prevPhaseRef.current;
     const curr = gameState?.phase;
     prevPhaseRef.current = curr;
     if (prev === 'initial_roll' && curr === 'playing' && lastResolvedRound?.decided) {
-      setFaceoffHold(true);
-      const t = window.setTimeout(() => setFaceoffHold(false), 1500);
+      setFaceoffPanelHold(true);
+      const t = window.setTimeout(() => {
+        setFaceoffPanelHold(false);
+        setFaceoffIntermission(true);
+      }, FACEOFF_RESULT_HOLD_MS);
       return () => window.clearTimeout(t);
     }
   }, [gameState?.phase, lastResolvedRound]);
 
-  const showFaceoff = isFaceoff || faceoffHold;
+  const showFaceoff = isFaceoff || faceoffPanelHold;
+
+  // Turn-change intermission: fires on every genuine currentPlayer flip during
+  // play (not on the first turn of the game, which the faceoff overlay already
+  // announces, and not on roll-only GAME_STATE re-emits where currentPlayer is
+  // unchanged). hasEnteredPlayingRef resets whenever we leave 'playing' (a new
+  // faceoff or game finishing) so the next game's first turn isn't mistaken for
+  // a flip either.
+  const [turnChangeIntermission, setTurnChangeIntermission] = useState(false);
+  const prevCurrentPlayerRef = useRef(gameState?.currentPlayer);
+  const hasEnteredPlayingRef = useRef(false);
+  useEffect(() => {
+    const phase = gameState?.phase;
+    const currPlayer = gameState?.currentPlayer;
+    if (phase !== 'playing') {
+      hasEnteredPlayingRef.current = false;
+      return;
+    }
+    if (!hasEnteredPlayingRef.current) {
+      hasEnteredPlayingRef.current = true;
+      prevCurrentPlayerRef.current = currPlayer;
+      return;
+    }
+    const prev = prevCurrentPlayerRef.current;
+    prevCurrentPlayerRef.current = currPlayer;
+    if (prev && currPlayer && prev !== currPlayer) {
+      setTurnChangeIntermission(true);
+    }
+  }, [gameState?.currentPlayer, gameState?.phase]);
+
+  const showTurnIntermission = faceoffIntermission || turnChangeIntermission;
 
   // Roll values to show: live faceoff rolls while in the faceoff phase, or the
   // just-resolved round's rolls during the post-decision hold.
@@ -123,9 +162,7 @@ export function GameView() {
         ? lastResolvedRound.firstPlayer === yourPlayer
           ? 'You go first!'
           : `${opponentName || 'Opponent'} goes first!`
-        : lastResolvedRound.player1Roll === 1 && lastResolvedRound.player2Roll === 1
-          ? 'Tied — Roll Again'
-          : 'No winner — Roll Again'
+        : 'Tied — Roll Again'
       : yourFaceoffRoll !== null && oppFaceoffRoll === null
         ? 'Waiting for opponent…'
         : null;
@@ -161,9 +198,9 @@ export function GameView() {
 
   const runRollAnimation = useCallback(() => {
     clearRollAnimation();
-    setRollingPreview(Math.floor(Math.random() * 6) + 1);
+    setRollingPreview(Math.floor(Math.random() * 5) + 1);
     rollAnimIntervalRef.current = window.setInterval(() => {
-      setRollingPreview(Math.floor(Math.random() * 6) + 1);
+      setRollingPreview(Math.floor(Math.random() * 5) + 1);
     }, 80);
     rollAnimTimeoutRef.current = window.setTimeout(() => {
       clearRollAnimation();
@@ -262,7 +299,7 @@ export function GameView() {
   }
 
   // ── Timer bar ────────────────────────────────────────────────────────────
-  const showTimer = timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && !faceoffHold;
+  const showTimer = timeLeft !== null && activeDeadline !== null && !gameOver && !isAiGame && !faceoffPanelHold && !showTurnIntermission;
   const timerBar = showTimer ? (
     <div className={`game-timer-bar${timeLeft <= 2 ? ' game-timer-bar--urgent' : ''}`}>
       <div
@@ -293,7 +330,7 @@ export function GameView() {
 
         {/* ── Player HUD ── */}
         <GameHUD
-          yourName={user?.displayName ?? user?.username ?? 'You'}
+          yourName={yourDisplayName}
           yourColor={myColor}
           yourBorneOff={yourBorneOff}
           opponentName={opponentName || 'Opponent'}
@@ -316,7 +353,7 @@ export function GameView() {
           <div className="game-faceoff-area">
             <div className="faceoff-card egypt-panel">
               <h3 className="egypt-heading faceoff-title">Faceoff — Roll for First Move</h3>
-              <p className="egypt-muted faceoff-subtitle">First to roll a 1 wins the faceoff.</p>
+              <p className="egypt-muted faceoff-subtitle">Highest roll wins the faceoff.</p>
 
               <div className="faceoff-current-round">
                 <p className="faceoff-round-label egypt-label">Round {faceoffRound}</p>
@@ -388,6 +425,23 @@ export function GameView() {
               onResignRequest={handleRequestResign}
               chatHasUnread={chatUnread}
             />
+
+            {/* ── Turn intermission overlay (post-faceoff handoff + every turn flip) ──
+                Scoped to this column (not the whole layout) so on desktop it only
+                covers the board/action/panel area, leaving the HUD visible; on
+                mobile it expands to the full screen via its own media query. */}
+            {showTurnIntermission && (
+              <TurnIntermission
+                variant={faceoffIntermission ? 'faceoff' : 'turn-change'}
+                activePlayer={(faceoffIntermission ? lastResolvedRound?.firstPlayer : gameState.currentPlayer) ?? yourPlayer}
+                yourPlayer={yourPlayer}
+                yourName={yourDisplayName}
+                yourColor={myColor}
+                opponentName={opponentName || 'Opponent'}
+                opponentColor={opponentColor || '#8B4513'}
+                onDismiss={() => { setFaceoffIntermission(false); setTurnChangeIntermission(false); }}
+              />
+            )}
           </div>
         )}
       </div>

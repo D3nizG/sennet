@@ -41,7 +41,7 @@ export interface GameRollResultPayload {
   playerId: PlayerId;
   value: number;
   legalMoves: Move[];
-  event?: string; // "blocked", "rolled_6", etc.
+  event?: string; // "blocked", etc.
 }
 
 export interface GameMoveAppliedPayload {

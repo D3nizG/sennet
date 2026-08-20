@@ -15,21 +15,20 @@ export function createRNG(seed: number): () => number {
 }
 
 /**
- * Generate a roll value 1-6 from a uniform RNG source.
- * value 6 → no movement, roll again
+ * Generate a roll value 1-5 from a uniform RNG source.
  * value 1 | 4 | 5 → move + roll again
  * value 2 | 3 → move + end turn
  */
 export function roll(rng: () => number): RollResult {
-  const value = Math.floor(rng() * 6) + 1;
+  const value = Math.floor(rng() * 5) + 1;
   return {
     value,
-    allowsMovement: value !== 6,
+    allowsMovement: true,
     grantsExtraRoll: value === 1 || value === 4 || value === 5,
   };
 }
 
-/** Generate a single integer 1-6. */
+/** Generate a single integer 1-5. */
 export function rollValue(rng: () => number): number {
-  return Math.floor(rng() * 6) + 1;
+  return Math.floor(rng() * 5) + 1;
 }

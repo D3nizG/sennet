@@ -40,9 +40,9 @@ describe('initGame', () => {
 });
 
 describe('performInitialRoll', () => {
-  it('decides first player when one rolls 1', () => {
+  it('decides first player when they roll higher', () => {
     let state = initGame('test');
-    state = performInitialRoll(state, 1, 3);
+    state = performInitialRoll(state, 3, 1);
     expect(state.initialRolls.decided).toBe(true);
     expect(state.initialRolls.firstPlayer).toBe('player1');
     expect(state.phase).toBe('playing');
@@ -50,7 +50,7 @@ describe('performInitialRoll', () => {
 
   it('places pieces after deciding — starter on odd indices', () => {
     let state = initGame('test');
-    state = performInitialRoll(state, 1, 3); // player1 wins
+    state = performInitialRoll(state, 3, 1); // player1 wins (higher roll)
     expect(state.pieces).toHaveLength(10);
 
     const p1 = state.pieces.filter(p => p.owner === 'player1');
@@ -70,16 +70,16 @@ describe('performInitialRoll', () => {
     expect(state.phase).toBe('initial_roll');
   });
 
-  it('does not decide when neither rolls 1', () => {
+  it('does not decide on a tie', () => {
     let state = initGame('test');
-    state = performInitialRoll(state, 4, 5);
+    state = performInitialRoll(state, 4, 4);
     expect(state.initialRolls.decided).toBe(false);
     expect(state.pieces).toHaveLength(0);
   });
 
-  it('p2 goes first and gets odd indices when they roll 1', () => {
+  it('p2 goes first and gets odd indices when they roll higher', () => {
     let state = initGame('test');
-    state = performInitialRoll(state, 3, 1);
+    state = performInitialRoll(state, 1, 4);
     expect(state.initialRolls.firstPlayer).toBe('player2');
     expect(state.currentPlayer).toBe('player2');
 
@@ -92,14 +92,6 @@ describe('performInitialRoll', () => {
 });
 
 describe('applyRoll', () => {
-  it('roll of 6 stays in roll phase, same player', () => {
-    const state = playingGame();
-    const next = applyRoll(state, 6);
-    expect(next.turnPhase).toBe('roll');
-    expect(next.currentPlayer).toBe('player1');
-    expect(next.currentRoll).toBeNull();
-  });
-
   it('roll with legal moves enters move phase', () => {
     const state = playingGame();
     const next = applyRoll(state, 2);

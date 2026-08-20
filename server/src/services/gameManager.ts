@@ -136,8 +136,7 @@ export class GameManager {
 
     // Detect event
     let event: string | undefined;
-    if (rollValue === 6) event = 'rolled_6';
-    if (legalMoves.length === 0 && rollValue !== 6) event = 'blocked';
+    if (legalMoves.length === 0) event = 'blocked';
 
     return { state: game.state, rollValue, legalMoves, event };
   }

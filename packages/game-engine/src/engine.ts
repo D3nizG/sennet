@@ -54,7 +54,7 @@ export function placePieces(firstPlayer: PlayerId): PieceState[] {
 
 /**
  * Process one round of simultaneous initial rolls.
- * First player to exclusively roll a 1 earns the right to go first.
+ * Higher roll wins the right to go first; a tie re-rolls.
  * When decided, pieces are placed on the board according to the rules:
  *   Winner → odd indices (1,3,5,7,9)   |   Other → even indices (0,2,4,6,8)
  */
@@ -67,13 +67,14 @@ export function performInitialRoll(
   let decided = false;
   let firstPlayer: PlayerId | null = null;
 
-  if (p1Roll === 1 && p2Roll !== 1) {
+  if (p1Roll > p2Roll) {
     decided = true;
     firstPlayer = 'player1';
-  } else if (p2Roll === 1 && p1Roll !== 1) {
+  } else if (p2Roll > p1Roll) {
     decided = true;
     firstPlayer = 'player2';
   }
+  // p1Roll === p2Roll → tie, decided stays false, caller re-rolls
 
   const newState: GameState = {
     ...state,
@@ -95,24 +96,11 @@ export function performInitialRoll(
 
 /**
  * Apply a dice roll to the game state.
- * - Roll 6 → no movement, log it, stay in roll phase (same player).
- * - Roll 1-5 → if legal moves exist enter move phase; else skip/block turn.
+ * Roll 1-5 → if legal moves exist enter move phase; else skip/block turn.
  */
 export function applyRoll(state: GameState, rollValue: number): GameState {
   if (state.phase !== 'playing') throw new Error('Game is not in playing phase');
   if (state.turnPhase !== 'roll') throw new Error('Not in roll phase');
-
-  // Roll of 6: no movement, roll again
-  if (rollValue === 6) {
-    return {
-      ...state,
-      currentRoll: null,
-      moveLog: [
-        ...state.moveLog,
-        logEntry(state.turnNumber, state.currentPlayer, 6, null, 'rolled_6'),
-      ],
-    };
-  }
 
   // Check legal moves
   const moves = getLegalMoves(state, state.currentPlayer, rollValue);

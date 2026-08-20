@@ -46,8 +46,8 @@ describe('runAITurn', () => {
     expect(result2.actions).toEqual([]);
   });
 
-  it('records rolled_6 and then plays next roll/move', () => {
-    mockedSecureRoll.mockReturnValueOnce(6).mockReturnValueOnce(2);
+  it('chains an extra roll (value 1) into the next roll/move', () => {
+    mockedSecureRoll.mockReturnValueOnce(1).mockReturnValueOnce(2);
     const start = state({
       pieces: [
         piece('player2_0', 'player2', 20),
@@ -56,9 +56,10 @@ describe('runAITurn', () => {
     });
 
     const result = runAITurn(start, 'player2', 'hard');
-    expect(result.actions[0]).toEqual({ type: 'roll', value: 6, event: 'rolled_6' });
-    expect(result.actions[1]).toEqual({ type: 'roll', value: 2 });
-    expect(result.actions[2]?.type).toBe('move');
+    expect(result.actions[0]).toEqual({ type: 'roll', value: 1 });
+    expect(result.actions[1]?.type).toBe('move');
+    expect(result.actions[2]).toEqual({ type: 'roll', value: 2 });
+    expect(result.actions[3]?.type).toBe('move');
     expect(result.finalState.currentPlayer).toBe('player1');
   });
 
