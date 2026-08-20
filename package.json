@@ -10,8 +10,8 @@
     "client"
   ],
   "scripts": {
-    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
-    "dev:server": "npm run dev -w server",
+    "dev": "npm run build -w @sennet/game-engine && concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:server": "npm run build -w @sennet/game-engine && npm run dev -w server",
     "dev:client": "npm run dev -w client",
     "build": "npm run build -w @sennet/game-engine && npm run build -w server && npm run build -w client",
     "test": "npm run test -w @sennet/game-engine && npm run test -w server",
